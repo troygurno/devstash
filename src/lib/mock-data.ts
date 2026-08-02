@@ -40,6 +40,9 @@ export interface MockCollection {
   /** types present in the collection, for the icon row on the card */
   typeIds: string[];
   itemCount: number;
+  createdAt: string;
+  /** sorts the sidebar's "Recent" list */
+  updatedAt: string;
 }
 
 export interface MockItem {
@@ -156,6 +159,8 @@ export const mockCollections: MockCollection[] = [
     dominantTypeId: "type-snippet",
     typeIds: ["type-snippet", "type-note", "type-link"],
     itemCount: 12,
+    createdAt: "2026-01-10T09:00:00.000Z",
+    updatedAt: "2026-07-30T14:25:00.000Z",
   },
   {
     id: "col-python-snippets",
@@ -165,6 +170,8 @@ export const mockCollections: MockCollection[] = [
     dominantTypeId: "type-snippet",
     typeIds: ["type-snippet", "type-note"],
     itemCount: 8,
+    createdAt: "2026-02-14T11:30:00.000Z",
+    updatedAt: "2026-06-18T10:05:00.000Z",
   },
   {
     id: "col-context-files",
@@ -174,6 +181,8 @@ export const mockCollections: MockCollection[] = [
     dominantTypeId: "type-file",
     typeIds: ["type-file", "type-note"],
     itemCount: 5,
+    createdAt: "2026-03-02T16:45:00.000Z",
+    updatedAt: "2026-07-19T16:20:00.000Z",
   },
   {
     id: "col-interview-prep",
@@ -183,6 +192,8 @@ export const mockCollections: MockCollection[] = [
     dominantTypeId: "type-note",
     typeIds: ["type-note", "type-snippet", "type-link", "type-prompt"],
     itemCount: 24,
+    createdAt: "2026-04-08T08:15:00.000Z",
+    updatedAt: "2026-08-01T09:40:00.000Z",
   },
   {
     id: "col-git-commands",
@@ -192,6 +203,8 @@ export const mockCollections: MockCollection[] = [
     dominantTypeId: "type-command",
     typeIds: ["type-command", "type-note"],
     itemCount: 15,
+    createdAt: "2026-05-21T13:00:00.000Z",
+    updatedAt: "2026-07-28T11:10:00.000Z",
   },
   {
     id: "col-ai-prompts",
@@ -201,6 +214,8 @@ export const mockCollections: MockCollection[] = [
     dominantTypeId: "type-prompt",
     typeIds: ["type-prompt", "type-snippet", "type-note"],
     itemCount: 18,
+    createdAt: "2026-06-05T15:20:00.000Z",
+    updatedAt: "2026-08-02T08:55:00.000Z",
   },
 ];
 

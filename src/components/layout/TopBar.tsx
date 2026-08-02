@@ -2,14 +2,19 @@ import { Plus, Search } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 
 /**
- * Display only for phase 1 — the search field is inert and "New Item" opens
- * nothing. Wiring comes with the command palette and item drawer.
+ * The sidebar trigger is live; the search field is still inert and "New Item"
+ * opens nothing. Wiring comes with the command palette and item drawer.
  */
 export function TopBar() {
   return (
     <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border px-4">
+      <SidebarTrigger className="-ml-1" />
+      <Separator orientation="vertical" className="mr-1 !h-6" />
+
       <div className="relative w-full max-w-md">
         <Search
           aria-hidden="true"
