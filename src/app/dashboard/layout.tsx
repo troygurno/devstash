@@ -1,18 +1,29 @@
-import { Sidebar } from "@/components/layout/Sidebar";
-import { TopBar } from "@/components/layout/TopBar";
+import { cookies } from "next/headers";
 
-export default function DashboardLayout({
+import { AppSidebar } from "@/components/layout/AppSidebar";
+import { TopBar } from "@/components/layout/TopBar";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { TooltipProvider } from "@/components/ui/tooltip";
+
+export default async function DashboardLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // The sidebar writes this cookie on every toggle. Reading it here means a reload
+  // renders the collapsed state directly instead of flashing open first.
+  const cookieStore = await cookies();
+  const defaultOpen = cookieStore.get("sidebar_state")?.value !== "false";
+
   return (
-    <div className="flex min-h-screen">
-      <Sidebar />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <TopBar />
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
-      </div>
-    </div>
+    <TooltipProvider>
+      <SidebarProvider defaultOpen={defaultOpen}>
+        <AppSidebar />
+        <SidebarInset>
+          <TopBar />
+          <div className="flex-1 overflow-y-auto p-6">{children}</div>
+        </SidebarInset>
+      </SidebarProvider>
+    </TooltipProvider>
   );
 }

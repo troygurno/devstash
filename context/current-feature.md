@@ -1,41 +1,68 @@
 # Current Feature
 
-**Dashboard UI — Phase 1 (shell & scaffolding)**
+**Dashboard UI — Phase 2 (sidebar)**
 
-Stand up the shadcn/ui foundation, the `/dashboard` route, and the app shell with a
-top bar. Sidebar and main area are placeholders this phase — they get filled in by
-phases 2 and 3.
+Replace the phase 1 sidebar placeholder with the real thing: item type navigation,
+collections, a user area at the bottom, and collapse/expand behavior that degrades
+to a drawer on mobile. The main area stays a placeholder until phase 3.
 
-Spec: @context/features/dashboard-phase-1-spec.md
+Spec: @context/features/dashboard-phase-2-spec.md
 
 ## Status
 
-Completed
+Built — awaiting browser sign-off
 
 ## Goals
 
-- [x] Initialize shadcn/ui (theme tokens, `components.json`, `cn` util)
-- [x] Install the shadcn components this phase needs
-- [x] Dashboard route at `/dashboard`
-- [x] Main dashboard layout + any global styles
-- [x] Dark mode by default
-- [x] Top bar: search field and "New Item" button — **display only**, no behavior
-- [x] Sidebar and main area as placeholders — just an `h2` reading "Sidebar" and "Main"
+- [x] Install the shadcn `sidebar` component and wrap the dashboard layout in
+      `SidebarProvider`
+- [x] Collapsible sidebar — collapses to icons only on desktop, toggled by a
+      `SidebarTrigger` in the top bar (left of the search field, per the screenshot)
+- [x] Always a drawer on mobile — off-canvas Sheet under `md`, opened by the same trigger
+- [x] Brand row (logo + "DevStash") at the top of the sidebar
+- [x] **Types** group — all 7 from `mockItemTypes`, each linking to `/items/[slug]`
+      (e.g. `/items/snippets`), with a colored icon and its item count
+- [x] **Collections › Favorites** — the starred collections, star instead of a count
+- [x] **Collections › Recent** — the 5 most recently updated collections, with counts
+- [x] Add `createdAt` / `updatedAt` to `MockCollection` + all six rows — Recent has
+      nothing to sort on otherwise
+- [x] Slug → Tailwind class map for type colors in `src/lib/item-types.ts`
+- [x] Both group headers (`Types`, `Collections`) individually collapsible via chevron
+- [x] User area pinned to the bottom — avatar with initials fallback, name, email,
+      settings gear
+- [x] Main area still a placeholder `h2`
+
+## Decisions
+
+Settled during spec review, where the spec, the screenshot, and
+@context/project-overview.md disagreed:
+
+| Question                            | Decision                                                                                                                                                    |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Second collections group            | **Recent**, per the spec — not the screenshot's `ALL COLLECTIONS`, which is really the non-favorites. Requires the new date fields.                          |
+| Sidebar implementation              | shadcn `sidebar` — collapse, mobile Sheet, and persistence come with it, and the `--sidebar-*` tokens are already in `globals.css` unused.                   |
+| Type colors vs. no-inline-styles    | Static slug → Tailwind class map. The hex in `mock-data.ts` stays as documentation; the class map is what renders. Reused for card borders in phase 3.       |
+| Extra scope                         | Per-section chevrons **in**. Pro badges on Files/Images, the top bar's "New Collection" button, and stub `/items` routes are all **out**.                    |
 
 ## Notes
 
-- Reference screenshot: @context/screenshots/dashboard-ui-main.png. The file in
-  `context/screenshots/` is actually named `dashboard-ui-mymain.png`; the correctly
-  named copy is at @context/dashboard-ui-main.png. Worth reconciling.
+- Reference screenshot: @context/screenshots/dashboard-ui-main.png
 - Tailwind v4 is CSS-first — theme tokens go in `@theme` inside `src/app/globals.css`.
-  Do **not** let `shadcn init` create a `tailwind.config.ts`.
-- No database yet. @src/lib/mock-data.ts is the single source of truth for display
-  data, though phase 1 renders placeholders and may not need it until phase 2.
-- Scope boundaries for the phases that follow:
-  - **Phase 2** — collapsible sidebar, type links to `/items/[type]`, favorite and
-    recent collections, user avatar area, mobile drawer.
-  - **Phase 3** — main area: recent collections, pinned items, 10 recent items, and
-    4 stats cards (items, collections, favorite items, favorite collections).
+  Never add a `tailwind.config.ts`.
+- No database yet. @src/lib/mock-data.ts is the single source of truth for display data.
+  `icon` is a lucide **name string**, so the sidebar needs an explicit name → component
+  map. Alias `Image` and `Link` on import — they collide with `next/image` and `next/link`.
+- **Assumption:** type order follows the `mockItemTypes` array (Links 5th), matching the
+  type table in @context/project-overview.md. The screenshot puts Links last.
+- **Assumption:** Recent includes favorites — a collection can appear in both groups.
+- Every sidebar link 404s this phase: `/items/[typeSlug]`, `/collections/[id]`, and
+  `/settings` are all unbuilt. Hrefs are correct per the route table in
+  @context/project-overview.md; the pages come later.
+- The `'use client'` boundary lives inside `src/components/ui/sidebar.tsx`, so
+  @src/components/layout/AppSidebar.tsx and @src/components/layout/TopBar.tsx both stay
+  server components even though the sidebar is interactive.
+- **Phase 3** (next) — main area: recent collections, pinned items, 10 recent items,
+  and 4 stats cards (items, collections, favorite items, favorite collections).
 
 ## History
 
@@ -71,3 +98,17 @@ Completed
 - All server components; nothing needed `'use client'`
 - Verified: `npm run build` and `npm run lint` clean, and `/dashboard` renders correctly in the browser at 1440×900
 - Known leftovers: `shadcn` was added to `dependencies` rather than `devDependencies`; `/` still renders the old placeholder `h1` and still conflicts with the route table in `project-overview.md`, which maps the dashboard to `/`
+
+### 2026-08-02 — Dashboard UI Phase 2 (sidebar)
+
+- Branch `feature/dashboard-phase-2`
+- Spec review first — the spec, the screenshot, and `project-overview.md` disagreed in four places; see the Decisions table above for what was settled and why
+- Added shadcn `sidebar`, `collapsible`, and `avatar`, which pulled in `sheet`, `tooltip`, `skeleton`, and `src/hooks/use-mobile.ts`. Still no `tailwind.config.ts`
+- `src/components/layout/Sidebar.tsx` → `AppSidebar.tsx` — the phase 1 name collided with the shadcn `Sidebar` primitive it now imports
+- `src/lib/item-types.ts` — lucide name → component map and slug → Tailwind class map. All seven hexes are exact palette matches (`#3b82f6` = `blue-500`, etc.), so nothing shifts visually by rendering classes instead of the hex
+- `MockCollection` grew `createdAt` / `updatedAt`. Recent sorts on `updatedAt` desc, capped at 5 — Python Snippets is the one left out
+- `SidebarTrigger` went into the top bar, left of the search field, with a vertical separator. `TooltipProvider` wraps the dashboard layout so collapsed-icon tooltips work; the newer shadcn `Tooltip` no longer self-provides
+- The layout reads the `sidebar_state` cookie so a reload renders the collapsed state directly instead of flashing open. This makes `/dashboard` a dynamic route (`ƒ`) rather than static
+- **Fixed a lint failure in vendored shadcn code:** `use-mobile.ts` ships with a `setState` inside an effect, which `react-hooks/set-state-in-effect` (new in eslint-config-next 16) rejects. Rewrote it on `useSyncExternalStore` with a `false` server snapshot. Re-running `shadcn add` for any sidebar-adjacent component will overwrite this
+- Verified: `npm run lint`, `npm run build`, and `npx tsc --noEmit` all clean. Server-rendered HTML at `/dashboard` confirms type order, counts, both collection groups, the `JD` initials fallback, and the trigger
+- **Not verified:** no browser automation was available this session, so collapse-to-icon, the mobile drawer, tooltips, and the chevron animations were not exercised visually
