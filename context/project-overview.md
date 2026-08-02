@@ -32,15 +32,15 @@
 
 Developer knowledge lives in eight different places at once:
 
-| What | Where it ends up |
-| --- | --- |
-| Code snippets | VS Code scratch files, Notion |
-| AI prompts | Buried in old chat threads |
-| Context files | Random project folders |
-| Useful links | Browser bookmarks (never revisited) |
-| Docs & notes | Wherever they were written |
-| Commands | `.txt` files, `~/.bash_history` |
-| Project templates | GitHub Gists |
+| What              | Where it ends up                    |
+| ----------------- | ----------------------------------- |
+| Code snippets     | VS Code scratch files, Notion       |
+| AI prompts        | Buried in old chat threads          |
+| Context files     | Random project folders              |
+| Useful links      | Browser bookmarks (never revisited) |
+| Docs & notes      | Wherever they were written          |
+| Commands          | `.txt` files, `~/.bash_history`     |
+| Project templates | GitHub Gists                        |
 
 The cost is context switching, lost knowledge, and inconsistent workflows across projects.
 
@@ -57,14 +57,14 @@ DevStash is one hub with:
 
 ## 2. Target Users
 
-| Persona | Primary need | Types they lean on |
-| --- | --- | --- |
-| **Everyday Developer** | Grab snippets, commands, and links fast | snippet, command, link |
-| **AI-first Developer** | Store prompts, contexts, system messages, workflows | prompt, file, note |
-| **Content Creator / Educator** | Reusable code blocks, explanations, course notes | snippet, note, image |
-| **Full-stack Builder** | Patterns, boilerplates, API examples | snippet, file, link |
+| Persona                        | Primary need                                        | Types they lean on     |
+| ------------------------------ | --------------------------------------------------- | ---------------------- |
+| **Everyday Developer**         | Grab snippets, commands, and links fast             | snippet, command, link |
+| **AI-first Developer**         | Store prompts, contexts, system messages, workflows | prompt, file, note     |
+| **Content Creator / Educator** | Reusable code blocks, explanations, course notes    | snippet, note, image   |
+| **Full-stack Builder**         | Patterns, boilerplates, API examples                | snippet, file, link    |
 
-**Design implication:** every persona above is a *heavy re-user* of saved material, not just a saver. Retrieval speed matters more than capture polish — which is why "Recently used", pinning, and search rank above the editor in priority.
+**Design implication:** every persona above is a _heavy re-user_ of saved material, not just a saver. Retrieval speed matters more than capture polish — which is why "Recently used", pinning, and search rank above the editor in priority.
 
 ---
 
@@ -103,15 +103,15 @@ DevStash is one hub with:
 
 Seven system types ship immutable (`isSystem: true`, `userId: null`). Custom types come later as a Pro feature.
 
-| Type | Slug | Content | Color | Hex | Lucide Icon | Tier |
-| --- | --- | --- | --- | --- | --- | --- |
-| Snippet | `snippets` | TEXT | 🔵 Blue | `#3b82f6` | `Code` | Free |
-| Prompt | `prompts` | TEXT | 🟣 Purple | `#8b5cf6` | `Sparkles` | Free |
-| Command | `commands` | TEXT | 🟠 Orange | `#f97316` | `Terminal` | Free |
-| Note | `notes` | TEXT | 🟡 Yellow | `#fde047` | `StickyNote` | Free |
-| Link | `links` | URL | 🟢 Emerald | `#10b981` | `Link` | Free |
-| File | `files` | FILE | ⚫ Gray | `#6b7280` | `File` | **Pro** |
-| Image | `images` | FILE | 🩷 Pink | `#ec4899` | `Image` | **Pro** |
+| Type    | Slug       | Content | Color      | Hex       | Lucide Icon  | Tier    |
+| ------- | ---------- | ------- | ---------- | --------- | ------------ | ------- |
+| Snippet | `snippets` | TEXT    | 🔵 Blue    | `#3b82f6` | `Code`       | Free    |
+| Prompt  | `prompts`  | TEXT    | 🟣 Purple  | `#8b5cf6` | `Sparkles`   | Free    |
+| Command | `commands` | TEXT    | 🟠 Orange  | `#f97316` | `Terminal`   | Free    |
+| Note    | `notes`    | TEXT    | 🟡 Yellow  | `#fde047` | `StickyNote` | Free    |
+| Link    | `links`    | URL     | 🟢 Emerald | `#10b981` | `Link`       | Free    |
+| File    | `files`    | FILE    | ⚫ Gray    | `#6b7280` | `File`       | **Pro** |
+| Image   | `images`   | FILE    | 🩷 Pink    | `#ec4899` | `Image`      | **Pro** |
 
 > ⚠️ **Contrast check:** `#fde047` (Note yellow) fails WCAG AA as a text color on a dark background and is nearly invisible on light. Use it for borders/badges only, or darken to `#eab308` when it carries text.
 
@@ -119,16 +119,73 @@ Define these once and import everywhere — never hardcode a hex in a component:
 
 ```ts
 // src/lib/item-types.ts
-import { Code, Sparkles, Terminal, StickyNote, File, Image, Link } from "lucide-react";
+import {
+  Code,
+  Sparkles,
+  Terminal,
+  StickyNote,
+  File,
+  Image,
+  Link,
+} from "lucide-react";
 
 export const ITEM_TYPES = {
-  snippet: { slug: "snippets", label: "Snippet", color: "#3b82f6", icon: Code,       contentType: "TEXT", pro: false },
-  prompt:  { slug: "prompts",  label: "Prompt",  color: "#8b5cf6", icon: Sparkles,   contentType: "TEXT", pro: false },
-  command: { slug: "commands", label: "Command", color: "#f97316", icon: Terminal,   contentType: "TEXT", pro: false },
-  note:    { slug: "notes",    label: "Note",    color: "#fde047", icon: StickyNote, contentType: "TEXT", pro: false },
-  link:    { slug: "links",    label: "Link",    color: "#10b981", icon: Link,       contentType: "URL",  pro: false },
-  file:    { slug: "files",    label: "File",    color: "#6b7280", icon: File,       contentType: "FILE", pro: true  },
-  image:   { slug: "images",   label: "Image",   color: "#ec4899", icon: Image,      contentType: "FILE", pro: true  },
+  snippet: {
+    slug: "snippets",
+    label: "Snippet",
+    color: "#3b82f6",
+    icon: Code,
+    contentType: "TEXT",
+    pro: false,
+  },
+  prompt: {
+    slug: "prompts",
+    label: "Prompt",
+    color: "#8b5cf6",
+    icon: Sparkles,
+    contentType: "TEXT",
+    pro: false,
+  },
+  command: {
+    slug: "commands",
+    label: "Command",
+    color: "#f97316",
+    icon: Terminal,
+    contentType: "TEXT",
+    pro: false,
+  },
+  note: {
+    slug: "notes",
+    label: "Note",
+    color: "#fde047",
+    icon: StickyNote,
+    contentType: "TEXT",
+    pro: false,
+  },
+  link: {
+    slug: "links",
+    label: "Link",
+    color: "#10b981",
+    icon: Link,
+    contentType: "URL",
+    pro: false,
+  },
+  file: {
+    slug: "files",
+    label: "File",
+    color: "#6b7280",
+    icon: File,
+    contentType: "FILE",
+    pro: true,
+  },
+  image: {
+    slug: "images",
+    label: "Image",
+    color: "#ec4899",
+    icon: Image,
+    contentType: "FILE",
+    pro: true,
+  },
 } as const;
 ```
 
@@ -215,14 +272,14 @@ erDiagram
 
 Six things worth fixing before the first migration — a schema change after real data exists is a much worse afternoon than a schema change now.
 
-| # | Change | Why |
-| --- | --- | --- |
-| 1 | **`contentType` moves from `Item` to `ItemType`** | Original notes have `Item.contentType` as `text \| file`, but the feature spec says a type is text, **url**, or file. Content shape is a property of the *type*, not the item — every snippet is text, every link is a URL. Storing it on `Item` lets the two disagree. |
-| 2 | **`ItemType.slug` added** | The spec calls for URLs like `/items/snippets`. Slugs need to be stored and unique, not derived from a display name that users can change. |
-| 3 | **`Item.lastUsedAt` added** | "Recently used" is in the feature list with nothing in the schema to support it. `updatedAt` is not a substitute — copying a snippet is a *use*, not an edit. |
-| 4 | **`Tag.userId` added + `@@unique([userId, name])`** | Without an owner, tags are global: renaming "react" affects every account, and tag counts leak other users' data. |
-| 5 | **Stripe fields expanded** | `stripePriceId` tells you monthly vs annual; `stripeCurrentPeriodEnd` lets you honor a subscription through a cancelled period instead of cutting access instantly. `isPro` becomes a cached mirror updated by webhook, never the source of truth. |
-| 6 | **Explicit `onDelete` on every relation** | Deleting a user should clear their items; deleting an ItemType a collection points at should null the `defaultTypeId`, not orphan the row. |
+| #   | Change                                              | Why                                                                                                                                                                                                                                                                     |
+| --- | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **`contentType` moves from `Item` to `ItemType`**   | Original notes have `Item.contentType` as `text \| file`, but the feature spec says a type is text, **url**, or file. Content shape is a property of the _type_, not the item — every snippet is text, every link is a URL. Storing it on `Item` lets the two disagree. |
+| 2   | **`ItemType.slug` added**                           | The spec calls for URLs like `/items/snippets`. Slugs need to be stored and unique, not derived from a display name that users can change.                                                                                                                              |
+| 3   | **`Item.lastUsedAt` added**                         | "Recently used" is in the feature list with nothing in the schema to support it. `updatedAt` is not a substitute — copying a snippet is a _use_, not an edit.                                                                                                           |
+| 4   | **`Tag.userId` added + `@@unique([userId, name])`** | Without an owner, tags are global: renaming "react" affects every account, and tag counts leak other users' data.                                                                                                                                                       |
+| 5   | **Stripe fields expanded**                          | `stripePriceId` tells you monthly vs annual; `stripeCurrentPeriodEnd` lets you honor a subscription through a cancelled period instead of cutting access instantly. `isPro` becomes a cached mirror updated by webhook, never the source of truth.                      |
+| 6   | **Explicit `onDelete` on every relation**           | Deleting a user should clear their items; deleting an ItemType a collection points at should null the `defaultTypeId`, not orphan the row.                                                                                                                              |
 
 ---
 
@@ -512,34 +569,34 @@ Mark the column `Unsupported("tsvector")?` in the schema so Prisma leaves it alo
 
 ### Page routes
 
-| Route | Purpose |
-| --- | --- |
-| `/` | Dashboard — pinned, recently used, collection grid |
-| `/items` | All items, filterable |
-| `/items/[typeSlug]` | Items of one type — `/items/snippets`, `/items/prompts` |
-| `/collections` | Collection grid |
-| `/collections/[id]` | Single collection with its items |
-| `/search` | Full search results with filters |
-| `/settings` | Profile, theme, data export |
-| `/settings/billing` | Plan, Stripe portal link |
-| `/login` · `/register` | Auth |
+| Route                  | Purpose                                                 |
+| ---------------------- | ------------------------------------------------------- |
+| `/`                    | Dashboard — pinned, recently used, collection grid      |
+| `/items`               | All items, filterable                                   |
+| `/items/[typeSlug]`    | Items of one type — `/items/snippets`, `/items/prompts` |
+| `/collections`         | Collection grid                                         |
+| `/collections/[id]`    | Single collection with its items                        |
+| `/search`              | Full search results with filters                        |
+| `/settings`            | Profile, theme, data export                             |
+| `/settings/billing`    | Plan, Stripe portal link                                |
+| `/login` · `/register` | Auth                                                    |
 
 ### API routes
 
-| Route | Methods | Notes |
-| --- | --- | --- |
-| `/api/auth/[...nextauth]` | — | Auth.js handler |
-| `/api/items` | `GET` `POST` | List + create; enforces free-tier item cap |
-| `/api/items/[id]` | `GET` `PATCH` `DELETE` | Ownership check on every call |
-| `/api/items/[id]/use` | `POST` | Bumps `lastUsedAt` |
-| `/api/items/[id]/collections` | `PUT` | Set collection membership |
-| `/api/collections` | `GET` `POST` | Enforces free-tier collection cap |
-| `/api/collections/[id]` | `GET` `PATCH` `DELETE` | |
-| `/api/upload` | `POST` | Returns a presigned R2 URL — Pro only |
-| `/api/search` | `GET` | |
-| `/api/ai/tag` · `/summarize` · `/explain` · `/optimize` | `POST` | Pro only, rate limited |
-| `/api/export` | `GET` | JSON/ZIP — Pro only |
-| `/api/stripe/checkout` · `/portal` · `/webhook` | `POST` | Webhook needs the raw body |
+| Route                                                   | Methods                | Notes                                      |
+| ------------------------------------------------------- | ---------------------- | ------------------------------------------ |
+| `/api/auth/[...nextauth]`                               | —                      | Auth.js handler                            |
+| `/api/items`                                            | `GET` `POST`           | List + create; enforces free-tier item cap |
+| `/api/items/[id]`                                       | `GET` `PATCH` `DELETE` | Ownership check on every call              |
+| `/api/items/[id]/use`                                   | `POST`                 | Bumps `lastUsedAt`                         |
+| `/api/items/[id]/collections`                           | `PUT`                  | Set collection membership                  |
+| `/api/collections`                                      | `GET` `POST`           | Enforces free-tier collection cap          |
+| `/api/collections/[id]`                                 | `GET` `PATCH` `DELETE` |                                            |
+| `/api/upload`                                           | `POST`                 | Returns a presigned R2 URL — Pro only      |
+| `/api/search`                                           | `GET`                  |                                            |
+| `/api/ai/tag` · `/summarize` · `/explain` · `/optimize` | `POST`                 | Pro only, rate limited                     |
+| `/api/export`                                           | `GET`                  | JSON/ZIP — Pro only                        |
+| `/api/stripe/checkout` · `/portal` · `/webhook`         | `POST`                 | Webhook needs the raw body                 |
 
 ### The drawer pattern
 
@@ -620,7 +677,7 @@ flowchart TB
 **Two things worth noting in that diagram:**
 
 1. **File uploads bypass the server.** The client asks `/api/upload` for a presigned URL, then PUTs directly to R2. Files never pass through a serverless function, so you avoid request body size limits and function timeouts entirely.
-2. **Stripe is the source of truth for billing.** `User.isPro` is written *only* by the webhook handler. Nothing else in the app ever sets it.
+2. **Stripe is the source of truth for billing.** `User.isPro` is written _only_ by the webhook handler. Nothing else in the app ever sets it.
 
 ### AI call flow
 
@@ -650,23 +707,23 @@ Always let the user confirm AI tags rather than applying them silently — wrong
 
 ## 9. Tech Stack
 
-| Layer | Choice | Docs |
-| --- | --- | --- |
-| Framework | Next.js 16 (App Router, Turbopack) | [nextjs.org/docs](https://nextjs.org/docs) · [v16 upgrade](https://nextjs.org/docs/app/guides/upgrading/version-16) |
-| UI | React 19.2 | [react.dev](https://react.dev) |
-| Language | TypeScript (strict) | [typescriptlang.org](https://www.typescriptlang.org/docs/) |
-| Styling | Tailwind CSS v4 | [tailwindcss.com](https://tailwindcss.com/docs) |
-| Components | shadcn/ui | [ui.shadcn.com](https://ui.shadcn.com) |
-| Icons | lucide-react | [lucide.dev](https://lucide.dev/icons/) |
-| Database | Neon Postgres (serverless) | [neon.com/docs](https://neon.com/docs) |
-| ORM | Prisma 7 + `@prisma/adapter-neon` | [prisma.io/docs](https://www.prisma.io/docs) |
-| Auth | Auth.js v5 (NextAuth) | [authjs.dev](https://authjs.dev) |
-| File storage | Cloudflare R2 (S3-compatible) | [developers.cloudflare.com/r2](https://developers.cloudflare.com/r2/) |
-| AI | OpenAI `gpt-5-nano` | [platform.openai.com/docs](https://platform.openai.com/docs) |
-| Payments | Stripe | [docs.stripe.com](https://docs.stripe.com) |
-| Editor | CodeMirror 6 or Monaco | [codemirror.net](https://codemirror.net/) |
-| Highlighting | Shiki | [shiki.style](https://shiki.style/) |
-| Cache (optional) | Upstash Redis | [upstash.com/docs](https://upstash.com/docs/redis) |
+| Layer            | Choice                             | Docs                                                                                                                |
+| ---------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Framework        | Next.js 16 (App Router, Turbopack) | [nextjs.org/docs](https://nextjs.org/docs) · [v16 upgrade](https://nextjs.org/docs/app/guides/upgrading/version-16) |
+| UI               | React 19.2                         | [react.dev](https://react.dev)                                                                                      |
+| Language         | TypeScript (strict)                | [typescriptlang.org](https://www.typescriptlang.org/docs/)                                                          |
+| Styling          | Tailwind CSS v4                    | [tailwindcss.com](https://tailwindcss.com/docs)                                                                     |
+| Components       | shadcn/ui                          | [ui.shadcn.com](https://ui.shadcn.com)                                                                              |
+| Icons            | lucide-react                       | [lucide.dev](https://lucide.dev/icons/)                                                                             |
+| Database         | Neon Postgres (serverless)         | [neon.com/docs](https://neon.com/docs)                                                                              |
+| ORM              | Prisma 7 + `@prisma/adapter-neon`  | [prisma.io/docs](https://www.prisma.io/docs)                                                                        |
+| Auth             | Auth.js v5 (NextAuth)              | [authjs.dev](https://authjs.dev)                                                                                    |
+| File storage     | Cloudflare R2 (S3-compatible)      | [developers.cloudflare.com/r2](https://developers.cloudflare.com/r2/)                                               |
+| AI               | OpenAI `gpt-5-nano`                | [platform.openai.com/docs](https://platform.openai.com/docs)                                                        |
+| Payments         | Stripe                             | [docs.stripe.com](https://docs.stripe.com)                                                                          |
+| Editor           | CodeMirror 6 or Monaco             | [codemirror.net](https://codemirror.net/)                                                                           |
+| Highlighting     | Shiki                              | [shiki.style](https://shiki.style/)                                                                                 |
+| Cache (optional) | Upstash Redis                      | [upstash.com/docs](https://upstash.com/docs/redis)                                                                  |
 
 ### Stack notes
 
@@ -688,21 +745,21 @@ Always let the user confirm AI tags rather than applying them silently — wrong
 
 Freemium, **$8/month or $72/year** (annual ≈ 25% off).
 
-| | Free | Pro |
-| --- | --- | --- |
-| Items | 50 | Unlimited |
-| Collections | 3 | Unlimited |
-| System types | All except file/image | All |
-| File & image uploads | ✗ | ✓ |
-| Storage cap | — | 5 GB *(TBD)* |
-| Search | Basic | Full |
-| AI auto-tagging | ✗ | ✓ |
-| AI summaries | ✗ | ✓ |
-| AI explain code | ✗ | ✓ |
-| AI prompt optimizer | ✗ | ✓ |
-| Export (JSON/ZIP) | ✗ | ✓ |
-| Custom types | ✗ | ✓ *(later)* |
-| Support | Community | Priority |
+|                      | Free                  | Pro          |
+| -------------------- | --------------------- | ------------ |
+| Items                | 50                    | Unlimited    |
+| Collections          | 3                     | Unlimited    |
+| System types         | All except file/image | All          |
+| File & image uploads | ✗                     | ✓            |
+| Storage cap          | —                     | 5 GB _(TBD)_ |
+| Search               | Basic                 | Full         |
+| AI auto-tagging      | ✗                     | ✓            |
+| AI summaries         | ✗                     | ✓            |
+| AI explain code      | ✗                     | ✓            |
+| AI prompt optimizer  | ✗                     | ✓            |
+| Export (JSON/ZIP)    | ✗                     | ✓            |
+| Custom types         | ✗                     | ✓ _(later)_  |
+| Support              | Community             | Priority     |
 
 **During development, every user gets everything.** Gate through a single helper so flipping it on is a one-line change:
 
@@ -710,7 +767,10 @@ Freemium, **$8/month or $72/year** (annual ≈ 25% off).
 // src/lib/limits.ts
 const DEV_UNLOCK_ALL = process.env.NODE_ENV !== "production";
 
-export const LIMITS = { free: { items: 50, collections: 3 }, pro: { items: Infinity, collections: Infinity } };
+export const LIMITS = {
+  free: { items: 50, collections: 3 },
+  pro: { items: Infinity, collections: Infinity },
+};
 
 export function canUse(user: { isPro: boolean }, feature: Feature) {
   if (DEV_UNLOCK_ALL) return true;
@@ -733,6 +793,13 @@ Modern, minimal, developer-focused. Dark mode by default, light mode optional. C
 **References:** [Linear](https://linear.app) (density + keyboard-first) · [Raycast](https://raycast.com) (command palette, speed) · [Notion](https://notion.so) (block editor, flexible organization)
 
 The thread connecting all three: **the interface gets out of the way**. Every one of them is usable without touching the mouse. That should be the bar.
+
+### Screenshots
+
+Refer to the screenshots below as a base for the dashboard UI. It dose not have to be exact. Use it as a reference:
+
+- @context/screenshots/dashboard-ui-main.png
+- @context/screenshots/dashboard-ui-drawer.png
 
 ### Layout
 
@@ -768,26 +835,26 @@ The thread connecting all three: **the interface gets out of the way**. Every on
 
 ### Interactions
 
-| Element | Behavior |
-| --- | --- |
-| Transitions | 150–200ms, ease-out. Use React 19.2 View Transitions for drawer open/close |
-| Cards | Hover lift + border brightening |
-| Actions | Toast on save, copy, delete — with **Undo** on delete |
-| Loading | Skeletons matching final layout, never spinners |
-| Empty states | Suggest a first action, not just "no items" |
+| Element      | Behavior                                                                   |
+| ------------ | -------------------------------------------------------------------------- |
+| Transitions  | 150–200ms, ease-out. Use React 19.2 View Transitions for drawer open/close |
+| Cards        | Hover lift + border brightening                                            |
+| Actions      | Toast on save, copy, delete — with **Undo** on delete                      |
+| Loading      | Skeletons matching final layout, never spinners                            |
+| Empty states | Suggest a first action, not just "no items"                                |
 
 ### Keyboard shortcuts
 
 This audience will judge the app on these:
 
-| Key | Action |
-| --- | --- |
-| `⌘K` | Command palette / search |
-| `⌘N` | New item drawer |
-| `⌘C` | Copy focused item content |
-| `⌘/` | Toggle sidebar |
-| `Esc` | Close drawer |
-| `J` / `K` | Move through the grid |
+| Key       | Action                    |
+| --------- | ------------------------- |
+| `⌘K`      | Command palette / search  |
+| `⌘N`      | New item drawer           |
+| `⌘C`      | Copy focused item content |
+| `⌘/`      | Toggle sidebar            |
+| `Esc`     | Close drawer              |
+| `J` / `K` | Move through the grid     |
 
 **One-click copy is the single most important interaction in the product.** A snippet manager where copying takes three clicks loses to a text file. Copy should be reachable on the card without opening the drawer.
 
@@ -799,17 +866,17 @@ Desktop-first, mobile usable. Sidebar collapses into a drawer under `md`. Cards 
 
 ## 12. Open Questions
 
-| # | Question | Why it matters |
-| --- | --- | --- |
-| 1 | Soft delete or hard delete? | A trash/restore window is easy now (`deletedAt` + filtered queries), painful to retrofit. Users *will* delete a snippet they need. |
-| 2 | Version history on items? | Editing a prompt destructively is the top complaint in tools like this. Even a "previous version" single-step undo helps. |
-| 3 | Storage cap for Pro? | "Unlimited" file uploads at $8/mo is an unbounded R2 bill. Pick a number — 5 GB is generous for this use case. |
-| 4 | Do free users see AI features greyed out, or hidden? | Greyed out converts better; hidden feels less nagging. |
-| 5 | What counts as "recently used"? | Copy only, or copy + open + edit? Affects whether the list is genuinely useful. |
-| 6 | Item content size limit? | A 5 MB paste into a `TEXT` column will wreck list queries. Cap around 100 KB and suggest the file type above it. |
-| 7 | Rate limit on AI endpoints? | Without one, a single Pro user can run up a real bill. Per-user daily cap. |
-| 8 | Public sharing in v1? | Changes the schema (`isPublic`, `publicSlug`) and is a strong growth lever. Cheaper to include now than to add later. |
-| 9 | Import from where? | Beyond local files — GitHub Gists and VS Code snippet JSON would cut onboarding friction sharply. |
+| #   | Question                                             | Why it matters                                                                                                                     |
+| --- | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Soft delete or hard delete?                          | A trash/restore window is easy now (`deletedAt` + filtered queries), painful to retrofit. Users _will_ delete a snippet they need. |
+| 2   | Version history on items?                            | Editing a prompt destructively is the top complaint in tools like this. Even a "previous version" single-step undo helps.          |
+| 3   | Storage cap for Pro?                                 | "Unlimited" file uploads at $8/mo is an unbounded R2 bill. Pick a number — 5 GB is generous for this use case.                     |
+| 4   | Do free users see AI features greyed out, or hidden? | Greyed out converts better; hidden feels less nagging.                                                                             |
+| 5   | What counts as "recently used"?                      | Copy only, or copy + open + edit? Affects whether the list is genuinely useful.                                                    |
+| 6   | Item content size limit?                             | A 5 MB paste into a `TEXT` column will wreck list queries. Cap around 100 KB and suggest the file type above it.                   |
+| 7   | Rate limit on AI endpoints?                          | Without one, a single Pro user can run up a real bill. Per-user daily cap.                                                         |
+| 8   | Public sharing in v1?                                | Changes the schema (`isPublic`, `publicSlug`) and is a strong growth lever. Cheaper to include now than to add later.              |
+| 9   | Import from where?                                   | Beyond local files — GitHub Gists and VS Code snippet JSON would cut onboarding friction sharply.                                  |
 
 ---
 
@@ -818,6 +885,7 @@ Desktop-first, mobile usable. Sidebar collapses into a drawer under `md`. Cards 
 Each phase ends somewhere shippable. Resist starting AI features before search works — search is what makes the rest usable.
 
 ### Phase 1 — Foundation
+
 - [ ] `create-next-app` with TypeScript, Tailwind v4, App Router
 - [ ] shadcn/ui init, theme tokens, dark mode default
 - [ ] Neon project + Prisma 7 with Neon adapter
@@ -826,6 +894,7 @@ Each phase ends somewhere shippable. Resist starting AI features before search w
 - [ ] App shell: sidebar, topbar, route guards
 
 ### Phase 2 — Core CRUD
+
 - [ ] Item drawer: create, edit, delete
 - [ ] Markdown editor + Shiki highlighting
 - [ ] Item cards with type-colored borders
@@ -834,6 +903,7 @@ Each phase ends somewhere shippable. Resist starting AI features before search w
 - [ ] Favorites, pinning, `lastUsedAt`
 
 ### Phase 3 — Organization
+
 - [ ] Collection CRUD
 - [ ] Add/remove items across multiple collections
 - [ ] Collection cards with dominant-type tinting
@@ -842,6 +912,7 @@ Each phase ends somewhere shippable. Resist starting AI features before search w
 - [ ] `⌘K` command palette
 
 ### Phase 4 — Pro Infrastructure
+
 - [ ] `limits.ts` gates, enforced server-side
 - [ ] R2 presigned uploads + file/image types
 - [ ] Stripe checkout, portal, webhooks
@@ -849,12 +920,14 @@ Each phase ends somewhere shippable. Resist starting AI features before search w
 - [ ] Export as JSON/ZIP
 
 ### Phase 5 — AI
+
 - [ ] OpenAI wrapper with structured JSON output
 - [ ] Auto-tag suggestions (accept/dismiss chips)
 - [ ] Summarize, explain code, optimize prompt
 - [ ] Per-user rate limiting
 
 ### Phase 6 — Polish
+
 - [ ] Keyboard shortcuts throughout
 - [ ] Loading skeletons + empty states
 - [ ] View Transitions on drawer
