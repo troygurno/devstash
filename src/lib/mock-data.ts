@@ -150,6 +150,10 @@ export const mockItemTypes: MockItemType[] = [
   },
 ];
 
+/** Lookup for resolving `Item.itemTypeId` / `Collection.dominantTypeId`. */
+export const mockItemTypesById: Record<string, MockItemType> =
+  Object.fromEntries(mockItemTypes.map((type) => [type.id, type]));
+
 export const mockCollections: MockCollection[] = [
   {
     id: "col-react-patterns",

@@ -1,12 +1,12 @@
 # Current Feature
 
-**Dashboard UI — Phase 2 (sidebar)**
+**Dashboard UI — Phase 3 (main area)**
 
-Replace the phase 1 sidebar placeholder with the real thing: item type navigation,
-collections, a user area at the bottom, and collapse/expand behavior that degrades
-to a drawer on mobile. The main area stays a placeholder until phase 3.
+Fill the `/dashboard` main area, replacing the phase 1 `Main` placeholder. Four stats
+cards, a collection grid, pinned items, and recent items — all read from
+@src/lib/mock-data.ts. Last of the three dashboard UI phases.
 
-Spec: @context/features/dashboard-phase-2-spec.md
+Spec: @context/features/dashboard-phase-3-spec.md
 
 ## Status
 
@@ -14,55 +14,48 @@ Built — awaiting browser sign-off
 
 ## Goals
 
-- [x] Install the shadcn `sidebar` component and wrap the dashboard layout in
-      `SidebarProvider`
-- [x] Collapsible sidebar — collapses to icons only on desktop, toggled by a
-      `SidebarTrigger` in the top bar (left of the search field, per the screenshot)
-- [x] Always a drawer on mobile — off-canvas Sheet under `md`, opened by the same trigger
-- [x] Brand row (logo + "DevStash") at the top of the sidebar
-- [x] **Types** group — all 7 from `mockItemTypes`, each linking to `/items/[slug]`
-      (e.g. `/items/snippets`), with a colored icon and its item count
-- [x] **Collections › Favorites** — the starred collections, star instead of a count
-- [x] **Collections › Recent** — the 5 most recently updated collections, with counts
-- [x] Add `createdAt` / `updatedAt` to `MockCollection` + all six rows — Recent has
-      nothing to sort on otherwise
-- [x] Slug → Tailwind class map for type colors in `src/lib/item-types.ts`
-- [x] Both group headers (`Types`, `Collections`) individually collapsible via chevron
-- [x] User area pinned to the bottom — avatar with initials fallback, name, email,
-      settings gear
-- [x] Main area still a placeholder `h2`
+- [x] Install the shadcn components this phase needs (`card`, `badge`)
+- [x] 4 stats cards at the top — total items, collections, favorite items,
+      favorite collections
+- [x] Collections section — card grid, 3 up on desktop, with a "View all" link
+- [x] Collection cards: left border tinted by dominant type, name, favorite star,
+      item count, description, and a row of the type icons it contains
+- [x] Pinned section — the pinned items, full-width rows
+- [x] Recent section — the 10 most recently used items
+- [x] Item rows: type-colored left border, type icon, title, pin/star markers,
+      description, tags, and a date on the right
+- [x] Extend `src/lib/item-types.ts` with border/background class maps — phase 2 only
+      needed text color
+- [x] Responsive: cards single-column under `sm`, grid 2 up at `md`
 
-## Decisions
+## Open Questions
 
-Settled during spec review, where the spec, the screenshot, and
-@context/project-overview.md disagreed:
+Answered during implementation. All three are one-line reversals if you disagree:
 
-| Question                            | Decision                                                                                                                                                    |
-| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Second collections group            | **Recent**, per the spec — not the screenshot's `ALL COLLECTIONS`, which is really the non-favorites. Requires the new date fields.                          |
-| Sidebar implementation              | shadcn `sidebar` — collapse, mobile Sheet, and persistence come with it, and the `--sidebar-*` tokens are already in `globals.css` unused.                   |
-| Type colors vs. no-inline-styles    | Static slug → Tailwind class map. The hex in `mock-data.ts` stays as documentation; the class map is what renders. Reused for card borders in phase 3.       |
-| Extra scope                         | Per-section chevrons **in**. Pro badges on Files/Images, the top bar's "New Collection" button, and stub `/items` routes are all **out**.                    |
+| #   | Question                                            | Answer                                                                                                                                                                                                                            |
+| --- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | What does the "total items" stat count?             | The **sum of the per-type counts (85)**, not `mockItems.length` (14). The sidebar renders those same per-type counts a few hundred pixels away — a total of 14 beside a sidebar reading "Snippets 24" reads as a bug. The other three stats come off the arrays. |
+| 2   | Do pinned items also appear in Recent?              | **No.** 14 items minus the 4 pinned leaves exactly the 10 Recent asks for, which is unlikely to be a coincidence in hand-written mock data. Nothing renders twice.                                                                 |
+| 3   | Is the collections grid capped?                     | **6**, by `updatedAt` desc — enough for all six mock collections, matching the screenshot, with the constant in place for when there are more.                                                                                     |
 
 ## Notes
 
-- Reference screenshot: @context/screenshots/dashboard-ui-main.png
+- Reference screenshot: @context/screenshots/dashboard-ui-main.png. Stats cards are
+  **not** in it — the spec says top of the main area, so above Collections.
 - Tailwind v4 is CSS-first — theme tokens go in `@theme` inside `src/app/globals.css`.
   Never add a `tailwind.config.ts`.
 - No database yet. @src/lib/mock-data.ts is the single source of truth for display data.
-  `icon` is a lucide **name string**, so the sidebar needs an explicit name → component
-  map. Alias `Image` and `Link` on import — they collide with `next/image` and `next/link`.
-- **Assumption:** type order follows the `mockItemTypes` array (Links 5th), matching the
-  type table in @context/project-overview.md. The screenshot puts Links last.
-- **Assumption:** Recent includes favorites — a collection can appear in both groups.
-- Every sidebar link 404s this phase: `/items/[typeSlug]`, `/collections/[id]`, and
-  `/settings` are all unbuilt. Hrefs are correct per the route table in
-  @context/project-overview.md; the pages come later.
-- The `'use client'` boundary lives inside `src/components/ui/sidebar.tsx`, so
-  @src/components/layout/AppSidebar.tsx and @src/components/layout/TopBar.tsx both stay
-  server components even though the sidebar is interactive.
-- **Phase 3** (next) — main area: recent collections, pinned items, 10 recent items,
-  and 4 stats cards (items, collections, favorite items, favorite collections).
+- Sort Recent on `lastUsedAt` desc, not `updatedAt` — per
+  @context/project-overview.md, copying an item is a *use*, not an edit. All 14 mock
+  items have a non-null `lastUsedAt`.
+- Collection card tint comes from `dominantTypeId`, which is already on
+  `MockCollection` — no query-time grouping needed while the data is mocked.
+- Item dates render as `Jan 15` in the screenshot. Format with an explicit locale so
+  the server and client agree; a bare `toLocaleDateString()` will hydrate-mismatch.
+- `/collections` (the "View all" target) is unbuilt and will 404, same as the phase 2
+  sidebar links.
+- Everything here can stay a server component — nothing on the page is interactive yet.
+  Copy buttons, the item drawer, and the `⌘K` palette are all later phases.
 
 ## History
 
@@ -112,3 +105,17 @@ Settled during spec review, where the spec, the screenshot, and
 - **Fixed a lint failure in vendored shadcn code:** `use-mobile.ts` ships with a `setState` inside an effect, which `react-hooks/set-state-in-effect` (new in eslint-config-next 16) rejects. Rewrote it on `useSyncExternalStore` with a `false` server snapshot. Re-running `shadcn add` for any sidebar-adjacent component will overwrite this
 - Verified: `npm run lint`, `npm run build`, and `npx tsc --noEmit` all clean. Server-rendered HTML at `/dashboard` confirms type order, counts, both collection groups, the `JD` initials fallback, and the trigger
 - **Not verified:** no browser automation was available this session, so collapse-to-icon, the mobile drawer, tooltips, and the chevron animations were not exercised visually
+- Merged to `main` as `593050f` and pushed. The duplicate `dashboard-ui-my*.png` screenshots went out as a separate `chore:` commit (`9214822`)
+
+### 2026-08-03 — Dashboard UI Phase 3 (main area)
+
+- Branch `feature/dashboard-phase-3`
+- Added shadcn `card` and `badge`. Still no `tailwind.config.ts`
+- `src/components/dashboard/StatsCards.tsx`, `src/components/collections/CollectionCard.tsx`, `src/components/items/ItemRow.tsx`; `src/app/dashboard/page.tsx` composes them
+- `item-types.ts` grew `getItemTypeBorderClass` and `getItemTypeBgClass` alongside the phase 2 text-color map
+- `src/lib/format.ts` — `formatShortDate` pinned to `en-US`. A bare `toLocaleDateString()` picks up the runtime default, which differs between server and browser and hydrate-mismatches
+- `mockItemTypesById` added to `mock-data.ts` for resolving `itemTypeId` / `dominantTypeId`
+- Item rows show **`createdAt`**, not `updatedAt` — the screenshot's "API Error Handling Pattern" reads Jan 12, its creation date, against a Jan 20 update
+- **Second lint fix in as many phases:** `react-hooks/static-components` rejects `const Icon = getItemTypeIcon(...)` in a component body, though the identical lookup inside a `.map()` callback in `AppSidebar` and `CollectionCard` passes. `ItemRow` returns the element from a plain `renderTypeIcon()` function instead
+- Verified: `npm run lint`, `npm run build`, `npx tsc --noEmit` clean. Served HTML confirms the four stat values (85 / 6 / 3 / 3), six collection cards in `updatedAt` order, 14 item rows split 4 pinned + 10 recent with no overlap, and all seven type tints
+- **Not verified:** still no browser automation, so hover states, the responsive breakpoints, and the overall visual match against the screenshot are unchecked
