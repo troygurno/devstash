@@ -1,61 +1,102 @@
 # Current Feature
 
-**Dashboard UI — Phase 3 (main area)**
+**Database — Neon Postgres + Prisma 7**
 
-Fill the `/dashboard` main area, replacing the phase 1 `Main` placeholder. Four stats
-cards, a collection grid, pinned items, and recent items — all read from
-@src/lib/mock-data.ts. Last of the three dashboard UI phases.
+Stand up the data layer: a Neon project with dev and prod branches, Prisma 7 wired
+through the Neon driver adapter, the full schema from @context/project-overview.md
+§6 plus the Auth.js models, an initial migration, and a seed for the seven system
+item types. Infrastructure only — the dashboard keeps reading
+@src/lib/mock-data.ts until a follow-up swaps it over.
 
-Spec: @context/features/dashboard-phase-3-spec.md
+Spec: @context/features/database-spec.md
 
 ## Status
 
-Completed
+Built — migrations applied and seeded against the dev branch
 
 ## Goals
 
-- [x] Install the shadcn components this phase needs (`card`, `badge`)
-- [x] 4 stats cards at the top — total items, collections, favorite items,
-      favorite collections
-- [x] Collections section — card grid, 3 up on desktop, with a "View all" link
-- [x] Collection cards: left border tinted by dominant type, name, favorite star,
-      item count, description, and a row of the type icons it contains
-- [x] Pinned section — the pinned items, full-width rows
-- [x] Recent section — the 10 most recently used items
-- [x] Item rows: type-colored left border, type icon, title, pin/star markers,
-      description, tags, and a date on the right
-- [x] Extend `src/lib/item-types.ts` with border/background class maps — phase 2 only
-      needed text color
-- [x] Responsive: cards single-column under `sm`, grid 2 up at `md`
+- [x] Neon project with a **dev** branch (`DATABASE_URL`) and a **prod** branch
+- [x] Install `prisma`, `@prisma/client`, `@prisma/adapter-neon`, `@neondatabase/serverless`
+- [x] Prisma 7 prerequisites: `"type": "module"` in `package.json`, `tsconfig.json`
+      on `"module": "ESNext"` / `"moduleResolution": "bundler"`
+- [x] `prisma.config.ts` at the project root — datasource, schema path, seed command
+- [x] `prisma/schema.prisma` — `User`, `ItemType`, `Item`, `Collection`,
+      `ItemCollection`, `Tag`, plus `Account`, `Session`, `VerificationToken`
+- [x] Indexes and explicit `onDelete` on every relation, per the schema in
+      @context/project-overview.md
+- [x] Initial migration via `prisma migrate dev` — never `db push`
+- [x] Hand-written migration for the partial unique index on system item types
+- [x] `prisma/seed.ts` — the 7 system types with fixed IDs so it's idempotent
+- [x] `src/lib/prisma.ts` — singleton client on the Neon adapter
+- [x] Git-ignore the generated client at `src/generated/prisma`
+- [x] Verify: `prisma migrate status` in sync, `npm run build`, `npm run lint`,
+      `npx tsc --noEmit` all clean
 
-## Open Questions
+## Decisions
 
-Answered during implementation. All three are one-line reversals if you disagree:
-
-| #   | Question                                            | Answer                                                                                                                                                                                                                            |
-| --- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | What does the "total items" stat count?             | The **sum of the per-type counts (85)**, not `mockItems.length` (14). The sidebar renders those same per-type counts a few hundred pixels away — a total of 14 beside a sidebar reading "Snippets 24" reads as a bug. The other three stats come off the arrays. |
-| 2   | Do pinned items also appear in Recent?              | **No.** 14 items minus the 4 pinned leaves exactly the 10 Recent asks for, which is unlikely to be a coincidence in hand-written mock data. Nothing renders twice.                                                                 |
-| 3   | Is the collections grid capped?                     | **6**, by `updatedAt` desc — enough for all six mock collections, matching the screenshot, with the constant in place for when there are more.                                                                                     |
+| #   | Question                                        | Decision                                                                                                                                                                    |
+| --- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Soft delete?                                    | **Yes** — nullable `deletedAt` on `Item` and `Collection`. `deletedAt` leads the list indexes, since every list query filters on it before sorting.                          |
+| 2   | Public sharing fields?                          | **Yes** — `isPublic` + unique `publicSlug` on both. Unused until the sharing feature; no migration or backfill when it lands.                                                |
+| 3   | Does this feature swap the dashboard over?      | **No.** Infra only. `mock-data.ts` still backs the dashboard; moving it is its own feature so a schema bug and a UI bug can't share a commit.                                |
+| 4   | How does `DATABASE_URL` get shared?             | `.gitignore` gained `!.env.example`, and `.env.example` documents where to find the Neon dev-branch string.                                                                  |
 
 ## Notes
 
-- Reference screenshot: @context/screenshots/dashboard-ui-main.png. Stats cards are
-  **not** in it — the spec says top of the main area, so above Collections.
-- Tailwind v4 is CSS-first — theme tokens go in `@theme` inside `src/app/globals.css`.
-  Never add a `tailwind.config.ts`.
-- No database yet. @src/lib/mock-data.ts is the single source of truth for display data.
-- Sort Recent on `lastUsedAt` desc, not `updatedAt` — per
-  @context/project-overview.md, copying an item is a *use*, not an edit. All 14 mock
-  items have a non-null `lastUsedAt`.
-- Collection card tint comes from `dominantTypeId`, which is already on
-  `MockCollection` — no query-time grouping needed while the data is mocked.
-- Item dates render as `Jan 15` in the screenshot. Format with an explicit locale so
-  the server and client agree; a bare `toLocaleDateString()` will hydrate-mismatch.
-- `/collections` (the "View all" target) is unbuilt and will 404, same as the phase 2
-  sidebar links.
-- Everything here can stay a server component — nothing on the page is interactive yet.
-  Copy buttons, the item drawer, and the `⌘K` palette are all later phases.
+Prisma 7 breaking changes, confirmed against the
+[upgrade guide](https://www.prisma.io/docs/orm/more/upgrade-guides/upgrading-versions/upgrading-to-prisma-7):
+
+- `prisma-client-js` is deprecated. Use the `prisma-client` generator, where `output`
+  is **required** — the client no longer lands in `node_modules`. Import from
+  `src/generated/prisma/client`, never `@prisma/client`.
+- Prisma ships ESM only. `"type": "module"` has to go in `package.json` — **verify
+  `next.config.ts` and `postcss.config.mjs` still load afterward**, since that flag
+  changes how every extensionless config file in the repo is interpreted.
+- A driver adapter is now mandatory. @context/project-overview.md specifies
+  `@prisma/adapter-neon` (over the guide's generic `@prisma/adapter-pg`) so queries
+  go over Neon's serverless driver.
+- `prisma.config.ts` at the root replaces schema-level config for the datasource URL,
+  schema path, and the seed command.
+- `prisma generate` **no longer runs automatically** after migrate commands, and
+  seeding no longer runs automatically — both are explicit steps now. `--skip-generate`
+  and `--skip-seed` are gone.
+
+Project specifics:
+
+- `@@unique([userId, slug])` on `ItemType` will **not** stop duplicate system types —
+  Postgres treats `NULL` as distinct, so two rows with `userId = NULL` both pass. Needs
+  a hand-written partial unique index, SQL in @context/project-overview.md.
+- Migrations always, `db push` never — per the spec and
+  @context/coding-standards.md. Dev branch gets `migrate dev`; prod gets
+  `migrate deploy` from CI.
+- `contentType` lives on `ItemType`, not `Item`; `Item.lastUsedAt` powers "Recently
+  used"; `Tag` is scoped by `userId`. All three are deliberate corrections recorded in
+  @context/project-overview.md §5.
+- `User.isPro` is a cached mirror of Stripe, written only by the webhook handler.
+- Search indexes (`pg_trgm`, the `tsvector` column) are **out of scope** — they land
+  with the search feature, as raw-SQL migrations.
+- Auth.js v5 credentials + Prisma adapter forces `session: { strategy: "jwt" }`. Not
+  this feature's problem, but the schema has to support it.
+- ~~**Blocked on you:** I can't create the Neon project or read its connection
+  string.~~ Resolved — `DATABASE_URL` was in `.env`, dev branch `neondb` on
+  `ep-aged-dew-ax53f78e-pooler.c-4.us-east-2.aws.neon.tech`.
+
+### One more Prisma 7 breaking change, found the hard way
+
+`datasource db { url = env("DATABASE_URL") }` is **rejected outright** in Prisma 7
+with `P1012` — the `url` property is no longer supported in schema files at all. It
+was not in the upgrade guide's summary, and the schema block in
+@context/project-overview.md §6 still carries it. The datasource block is now just:
+
+```prisma
+datasource db {
+  provider = "postgresql"
+}
+```
+
+The connection string reaches Migrate through `prisma.config.ts` and reaches the
+client through the driver adapter. Nothing else.
 
 ## History
 
@@ -120,3 +161,18 @@ Answered during implementation. All three are one-line reversals if you disagree
 - Verified: `npm run lint`, `npm run build`, `npx tsc --noEmit` clean. Served HTML confirms the four stat values (85 / 6 / 3 / 3), six collection cards in `updatedAt` order, 14 item rows split 4 pinned + 10 recent with no overlap, and all seven type tints
 - **Not verified by me:** no browser automation this session, so hover states, the responsive breakpoints, and the overall visual match against the screenshot went unchecked on my side. Signed off by Troy on 2026-08-03, closing phases 2 and 3
 - Merged to `main` as `40f0911` and pushed. Completes the three-phase dashboard UI
+
+### 2026-08-03 — Database: Neon Postgres + Prisma 7
+
+- Branch `feature/database-prisma-neon`
+- Installed `prisma` 7.9.1, `@prisma/client`, `@prisma/adapter-neon`, `@neondatabase/serverless`, plus `dotenv` and `tsx` for the config and seed
+- `"type": "module"` added to `package.json`. Low risk here — the only root configs are `next.config.ts`, `postcss.config.mjs`, and `eslint.config.mjs`, none of them extensionless `.js`. `tsconfig.json` already had `module: esnext` / `moduleResolution: bundler`, so it needed no change
+- **`datasource.url` is rejected in Prisma 7** (`P1012`) — not just deprecated. The schema block in `project-overview.md` §6 still has it and will fail if copied. Connection string reaches Migrate via `prisma.config.ts` and the client via the adapter
+- Prisma's CLI runs outside Next, so nothing loads `.env` for it — `prisma.config.ts` imports `dotenv/config` explicitly
+- Schema per `project-overview.md` §6, plus the two approved additions: `deletedAt` on `Item`/`Collection`, and `isPublic` + unique `publicSlug` on both. List indexes lead with `deletedAt` since every list query filters it before sorting
+- Two migrations: `20260803185015_init` and `20260803185100_system_type_slug_unique`. The second is hand-written — Prisma can't express a partial unique index, and `@@unique([userId, slug])` does not stop duplicate system types because Postgres treats `NULL` as distinct
+- `prisma/seed.ts` upserts the 7 system types on fixed IDs (`sys-type-snippet`, …) so re-running is safe and the same row keeps the same id across environments
+- npm scripts added: `db:generate`, `db:migrate`, `db:deploy`, `db:status`, `db:seed`, `db:studio`, `db:test`
+- `scripts/test-db.ts` — 15-check smoke test covering connection, seed state, the partial index, a CRUD round-trip, soft delete, and cascade deletes. Writes against `DATABASE_URL`, so it belongs on the dev branch; everything hangs off one throwaway user deleted at both ends of the run
+- Verified: `migrate status` in sync, seed run twice leaves exactly 7 rows, all seven slugs/contentTypes correct with `userId` null, and a duplicate system slug is **rejected** by the partial index. `npm run lint`, `npm run build`, `npx tsc --noEmit` all clean
+- **Not verified:** nothing imports `src/lib/prisma.ts` yet, so Next has never bundled the client or the Neon driver. That gets exercised when the dashboard moves off `mock-data.ts`

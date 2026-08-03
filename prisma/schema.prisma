@@ -1,0 +1,235 @@
+// Prisma 7. The `prisma-client` generator replaces `prisma-client-js`, `output` is
+// required, and the client no longer lands in node_modules — import it from
+// src/generated/prisma/client, never from "@prisma/client".
+//
+// Datasource URL and the seed command live in prisma.config.ts, not here.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+// No `url` here — Prisma 7 rejects it outright (P1012). The connection string for
+// Migrate lives in prisma.config.ts; the client gets it via the driver adapter.
+datasource db {
+  provider = "postgresql"
+}
+
+enum ContentType {
+  TEXT
+  URL
+  FILE
+}
+
+// ─────────────────────────────────────────────
+// USER
+// ─────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String? // null for OAuth-only accounts
+
+  // Billing. isPro is a cached mirror of Stripe, written only by the webhook
+  // handler — never treat it as the source of truth.
+  isPro                  Boolean   @default(false)
+  stripeCustomerId       String?   @unique
+  stripeSubscriptionId   String?   @unique
+  stripePriceId          String?
+  stripeCurrentPeriodEnd DateTime?
+
+  accounts    Account[]
+  sessions    Session[]
+  items       Item[]
+  collections Collection[]
+  itemTypes   ItemType[] // custom types only
+  tags        Tag[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────
+// ITEM TYPES
+// ─────────────────────────────────────────────
+
+model ItemType {
+  id          String      @id @default(cuid())
+  name        String // "Snippet"
+  slug        String // "snippets" → /items/snippets
+  icon        String // lucide icon name, e.g. "Code"
+  color       String // hex, e.g. "#3b82f6"
+  contentType ContentType @default(TEXT)
+  isSystem    Boolean     @default(false)
+  sortOrder   Int         @default(0)
+
+  userId String? // null for system types
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  items          Item[]
+  defaultForColl Collection[] @relation("CollectionDefaultType")
+
+  createdAt DateTime @default(now())
+
+  // Does NOT constrain system types — Postgres treats NULL as distinct, so two rows
+  // with userId = NULL and the same slug both pass. A partial unique index in
+  // migrations/20260803_system_type_slug_unique covers that case.
+  @@unique([userId, slug])
+  @@index([userId])
+}
+
+// ─────────────────────────────────────────────
+// ITEMS
+// ─────────────────────────────────────────────
+
+model Item {
+  id          String  @id @default(cuid())
+  title       String
+  description String?
+
+  // Exactly one of these is populated, based on itemType.contentType
+  content  String? @db.Text // TEXT
+  url      String? // URL
+  fileUrl  String? // FILE — R2 object key
+  fileName String?
+  fileSize Int? // bytes
+
+  language   String? // "typescript", "python" — syntax highlighting
+  isFavorite Boolean @default(false)
+  isPinned   Boolean @default(false)
+
+  // Public sharing. Unused until the sharing feature ships; carried from the start
+  // so enabling it is not a migration plus a backfill.
+  isPublic   Boolean @default(false)
+  publicSlug String? @unique
+
+  lastUsedAt DateTime? // bumped on copy/open — powers "Recently used"
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  deletedAt  DateTime? // soft delete — every read path must filter this
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  itemTypeId String
+  itemType   ItemType @relation(fields: [itemTypeId], references: [id], onDelete: Restrict)
+
+  collections ItemCollection[]
+  tags        Tag[]
+
+  // deletedAt leads the list indexes: every list query filters it, so it belongs
+  // left of the sort column.
+  @@index([userId, deletedAt, updatedAt(sort: Desc)])
+  @@index([userId, deletedAt, lastUsedAt(sort: Desc)])
+  @@index([userId, deletedAt, itemTypeId])
+  @@index([userId, deletedAt, isPinned, isFavorite])
+}
+
+// ─────────────────────────────────────────────
+// COLLECTIONS
+// ─────────────────────────────────────────────
+
+model Collection {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+  isFavorite  Boolean @default(false)
+
+  isPublic   Boolean @default(false)
+  publicSlug String? @unique
+
+  // Pre-selects a type in the "new item" drawer for empty collections
+  defaultTypeId String?
+  defaultType   ItemType? @relation("CollectionDefaultType", fields: [defaultTypeId], references: [id], onDelete: SetNull)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  items ItemCollection[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@unique([userId, name])
+  @@index([userId, deletedAt, updatedAt(sort: Desc)])
+}
+
+model ItemCollection {
+  itemId       String
+  collectionId String
+  addedAt      DateTime @default(now())
+
+  item       Item       @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+
+  @@id([itemId, collectionId])
+  @@index([collectionId, addedAt(sort: Desc)])
+}
+
+// ─────────────────────────────────────────────
+// TAGS
+// ─────────────────────────────────────────────
+
+model Tag {
+  id   String @id @default(cuid())
+  name String
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  items Item[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+// ─────────────────────────────────────────────
+// AUTH.JS v5
+// ─────────────────────────────────────────────
+// Credentials + the Prisma adapter forces session: { strategy: "jwt" }. Session is
+// kept anyway so switching to database sessions later needs no migration.
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
