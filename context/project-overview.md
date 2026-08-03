@@ -296,9 +296,11 @@ generator client {
   output   = "../src/generated/prisma"
 }
 
+// `url` is REJECTED here in Prisma 7 (error P1012), not merely deprecated.
+// The connection string lives in prisma.config.ts and reaches the client via the
+// driver adapter. Verified against Prisma 7.9.1 on 2026-08-03.
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 enum ContentType {
