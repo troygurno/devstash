@@ -44,6 +44,28 @@ const ITEM_TYPE_COLOR_CLASSES: Record<string, string> = {
   images: "text-pink-500",
 };
 
+/** Type slug → left-border color, for the accent stripe on cards and item rows. */
+const ITEM_TYPE_BORDER_CLASSES: Record<string, string> = {
+  snippets: "border-l-blue-500",
+  prompts: "border-l-violet-500",
+  commands: "border-l-orange-500",
+  notes: "border-l-yellow-300",
+  links: "border-l-emerald-500",
+  files: "border-l-gray-500",
+  images: "border-l-pink-500",
+};
+
+/** Type slug → tinted background, for the icon tile on an item row. */
+const ITEM_TYPE_BG_CLASSES: Record<string, string> = {
+  snippets: "bg-blue-500/10",
+  prompts: "bg-violet-500/10",
+  commands: "bg-orange-500/10",
+  notes: "bg-yellow-300/10",
+  links: "bg-emerald-500/10",
+  files: "bg-gray-500/10",
+  images: "bg-pink-500/10",
+};
+
 /** Falls back to a generic file icon for a name we don't recognize. */
 export function getItemTypeIcon(iconName: string): LucideIcon {
   return ITEM_TYPE_ICONS[iconName] ?? FileIcon;
@@ -52,4 +74,12 @@ export function getItemTypeIcon(iconName: string): LucideIcon {
 /** Falls back to the muted foreground for a slug we don't recognize. */
 export function getItemTypeColorClass(slug: string): string {
   return ITEM_TYPE_COLOR_CLASSES[slug] ?? "text-muted-foreground";
+}
+
+export function getItemTypeBorderClass(slug: string): string {
+  return ITEM_TYPE_BORDER_CLASSES[slug] ?? "border-l-border";
+}
+
+export function getItemTypeBgClass(slug: string): string {
+  return ITEM_TYPE_BG_CLASSES[slug] ?? "bg-muted";
 }
