@@ -1,102 +1,70 @@
 # Current Feature
 
-**Database — Neon Postgres + Prisma 7**
+**Seed data — demo user, collections, and items**
 
-Stand up the data layer: a Neon project with dev and prod branches, Prisma 7 wired
-through the Neon driver adapter, the full schema from @context/project-overview.md
-§6 plus the Auth.js models, an initial migration, and a seed for the seven system
-item types. Infrastructure only — the dashboard keeps reading
-@src/lib/mock-data.ts until a follow-up swaps it over.
+Rewrite @prisma/seed.ts to populate the dev database with a realistic working set:
+a demo user with a hashed password, the seven system item types (already there), and
+five collections holding 18 items. Gives the app something to render once the
+dashboard moves off @src/lib/mock-data.ts, and gives auth a real account to log in
+with.
 
-Spec: @context/features/database-spec.md
+Spec: @context/features/seed-spec.md
 
 ## Status
 
-Built — migrations applied and seeded against the dev branch
+Built — seeded and verified against the dev branch
 
 ## Goals
 
-- [x] Neon project with a **dev** branch (`DATABASE_URL`) and a **prod** branch
-- [x] Install `prisma`, `@prisma/client`, `@prisma/adapter-neon`, `@neondatabase/serverless`
-- [x] Prisma 7 prerequisites: `"type": "module"` in `package.json`, `tsconfig.json`
-      on `"module": "ESNext"` / `"moduleResolution": "bundler"`
-- [x] `prisma.config.ts` at the project root — datasource, schema path, seed command
-- [x] `prisma/schema.prisma` — `User`, `ItemType`, `Item`, `Collection`,
-      `ItemCollection`, `Tag`, plus `Account`, `Session`, `VerificationToken`
-- [x] Indexes and explicit `onDelete` on every relation, per the schema in
-      @context/project-overview.md
-- [x] Initial migration via `prisma migrate dev` — never `db push`
-- [x] Hand-written migration for the partial unique index on system item types
-- [x] `prisma/seed.ts` — the 7 system types with fixed IDs so it's idempotent
-- [x] `src/lib/prisma.ts` — singleton client on the Neon adapter
-- [x] Git-ignore the generated client at `src/generated/prisma`
-- [x] Verify: `prisma migrate status` in sync, `npm run build`, `npm run lint`,
-      `npx tsc --noEmit` all clean
+- [x] Install `bcryptjs` — the spec calls for a 12-round hash
+- [x] Demo user: `demo@devstash.io` / `Demo User` / password `12345678`,
+      `isPro: false`, `emailVerified` set
+- [x] Keep the 7 system item types, unchanged and still upserted on fixed IDs
+- [x] **React Patterns** — 3 TypeScript snippets (custom hooks, component patterns,
+      utility functions)
+- [x] **AI Workflows** — 3 prompts (code review, doc generation, refactoring)
+- [x] **DevOps** — 1 snippet, 1 command, 2 links (real URLs)
+- [x] **Terminal Commands** — 4 commands (git, docker, process management, package
+      managers)
+- [x] **Design Resources** — 4 links (real URLs: CSS/Tailwind, component libraries,
+      design systems, icon libraries)
+- [x] Everything upserted on fixed IDs so `npm run db:seed` stays re-runnable
+- [x] Extend `scripts/test-db.ts` to assert the seeded shape
+- [x] Verify: seed twice, counts unchanged; `npm run lint`, `npm run build`,
+      `npx tsc --noEmit` clean
 
-## Decisions
+## Open Questions
 
-| #   | Question                                        | Decision                                                                                                                                                                    |
-| --- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Soft delete?                                    | **Yes** — nullable `deletedAt` on `Item` and `Collection`. `deletedAt` leads the list indexes, since every list query filters on it before sorting.                          |
-| 2   | Public sharing fields?                          | **Yes** — `isPublic` + unique `publicSlug` on both. Unused until the sharing feature; no migration or backfill when it lands.                                                |
-| 3   | Does this feature swap the dashboard over?      | **No.** Infra only. `mock-data.ts` still backs the dashboard; moving it is its own feature so a schema bug and a UI bug can't share a commit.                                |
-| 4   | How does `DATABASE_URL` get shared?             | `.gitignore` gained `!.env.example`, and `.env.example` documents where to find the Neon dev-branch string.                                                                  |
+Resolved by drawing one line: **fill in unspecified fields on items the spec
+requires, but don't invent items the spec doesn't list.**
+
+| #   | Question                                          | Resolution                                                                                                                                                              |
+| --- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Nothing pinned, favorited, or used?               | **Filled in.** 3 pinned, 6 favorited, all 18 with a fixed `lastUsedAt`. These are columns on items the spec already mandates, and Pinned/Recent are the whole dashboard. |
+| 2   | No tags?                                          | **Filled in.** 25 tags across the 18 items. Same reasoning — `ItemRow` renders tag badges and the relation already exists.                                              |
+| 3   | Notes, files, images get zero items?              | **Left at zero.** Adding note items would be inventing content the spec doesn't ask for. Files and images are Pro types needing R2 anyway. The sidebar will read "Notes 0" until a later feature. |
 
 ## Notes
 
-Prisma 7 breaking changes, confirmed against the
-[upgrade guide](https://www.prisma.io/docs/orm/more/upgrade-guides/upgrading-versions/upgrading-to-prisma-7):
-
-- `prisma-client-js` is deprecated. Use the `prisma-client` generator, where `output`
-  is **required** — the client no longer lands in `node_modules`. Import from
-  `src/generated/prisma/client`, never `@prisma/client`.
-- Prisma ships ESM only. `"type": "module"` has to go in `package.json` — **verify
-  `next.config.ts` and `postcss.config.mjs` still load afterward**, since that flag
-  changes how every extensionless config file in the repo is interpreted.
-- A driver adapter is now mandatory. @context/project-overview.md specifies
-  `@prisma/adapter-neon` (over the guide's generic `@prisma/adapter-pg`) so queries
-  go over Neon's serverless driver.
-- `prisma.config.ts` at the root replaces schema-level config for the datasource URL,
-  schema path, and the seed command.
-- `prisma generate` **no longer runs automatically** after migrate commands, and
-  seeding no longer runs automatically — both are explicit steps now. `--skip-generate`
-  and `--skip-seed` are gone.
-
-Project specifics:
-
-- `@@unique([userId, slug])` on `ItemType` will **not** stop duplicate system types —
-  Postgres treats `NULL` as distinct, so two rows with `userId = NULL` both pass. Needs
-  a hand-written partial unique index, SQL in @context/project-overview.md.
-- Migrations always, `db push` never — per the spec and
-  @context/coding-standards.md. Dev branch gets `migrate dev`; prod gets
-  `migrate deploy` from CI.
-- `contentType` lives on `ItemType`, not `Item`; `Item.lastUsedAt` powers "Recently
-  used"; `Tag` is scoped by `userId`. All three are deliberate corrections recorded in
-  @context/project-overview.md §5.
-- `User.isPro` is a cached mirror of Stripe, written only by the webhook handler.
-- Search indexes (`pg_trgm`, the `tsvector` column) are **out of scope** — they land
-  with the search feature, as raw-SQL migrations.
-- Auth.js v5 credentials + Prisma adapter forces `session: { strategy: "jwt" }`. Not
-  this feature's problem, but the schema has to support it.
-- ~~**Blocked on you:** I can't create the Neon project or read its connection
-  string.~~ Resolved — `DATABASE_URL` was in `.env`, dev branch `neondb` on
-  `ep-aged-dew-ax53f78e-pooler.c-4.us-east-2.aws.neon.tech`.
-
-### One more Prisma 7 breaking change, found the hard way
-
-`datasource db { url = env("DATABASE_URL") }` is **rejected outright** in Prisma 7
-with `P1012` — the `url` property is no longer supported in schema files at all. It
-was not in the upgrade guide's summary, and the schema block in
-@context/project-overview.md §6 still carries it. The datasource block is now just:
-
-```prisma
-datasource db {
-  provider = "postgresql"
-}
-```
-
-The connection string reaches Migrate through `prisma.config.ts` and reaches the
-client through the driver adapter. Nothing else.
+- **The spec's type table conflicts with the existing seed** in two harmless ways and
+  one that matters. Order differs (spec puts links last; @context/project-overview.md
+  §4 and the current seed put links 5th), and names are lowercase where the seed
+  capitalizes them. More importantly the spec omits `slug` and `contentType`, both of
+  which are **required** by the schema and relied on by the UI. Keeping the existing
+  seed's values for all three; the spec's icons and colors match exactly.
+- Password `12345678` is a dev credential. It must never be seeded into the prod
+  branch — the seed is manual (`npm run db:seed`), so this stays a discipline issue,
+  not an automated one.
+- `emailVerified: new Date()` makes the row differ on every run. Harmless, but it
+  means "seed twice, nothing changed" is only true of counts, not of every column.
+- Item counts by type land at 4 snippets, 3 prompts, 5 commands, 6 links — 18 items
+  across 5 collections.
+- Seeding changes nothing visible yet. The dashboard still reads
+  @src/lib/mock-data.ts; swapping it is a separate feature.
+- Still true from the database feature: nothing imports @src/lib/prisma.ts, so Next
+  has never bundled the client. A seed script runs under `tsx`, so this feature
+  won't close that gap either.
+- The prod Neon branch still has **no migrations applied** and no seed.
 
 ## History
 
@@ -176,3 +144,19 @@ client through the driver adapter. Nothing else.
 - `scripts/test-db.ts` — 15-check smoke test covering connection, seed state, the partial index, a CRUD round-trip, soft delete, and cascade deletes. Writes against `DATABASE_URL`, so it belongs on the dev branch; everything hangs off one throwaway user deleted at both ends of the run
 - Verified: `migrate status` in sync, seed run twice leaves exactly 7 rows, all seven slugs/contentTypes correct with `userId` null, and a duplicate system slug is **rejected** by the partial index. `npm run lint`, `npm run build`, `npx tsc --noEmit` all clean
 - **Not verified:** nothing imports `src/lib/prisma.ts` yet, so Next has never bundled the client or the Neon driver. That gets exercised when the dashboard moves off `mock-data.ts`
+- Merged to `main` as `b166480` and pushed. Carried forward at rollover: the prod Neon branch still has no migrations applied and no seed
+
+### 2026-08-03 — Seed data (demo user, collections, items)
+
+- Branch `feature/seed-data`
+- Installed `bcryptjs` 3.x. Skipped `@types/bcryptjs` — v3 ships its own types and the DefinitelyTyped package (still on 2.x) conflicts with them
+- Rewrote `prisma/seed.ts`: 7 system types (unchanged), 1 demo user, 25 tags, 5 collections, 18 items. Everything upserts on a fixed id
+- **Spec vs. schema conflict:** the seed spec's type table omits `slug` and `contentType`, both required by the schema and relied on by the sidebar, and it orders/cases the types differently from `project-overview.md` §4. Kept the existing seed's values; the spec's icons and colors matched exactly, so nothing visual changed
+- The spec specifies no tags, pins, favorites, or `lastUsedAt`. Filled those in on the items it *does* specify, since Pinned and Recent are the entire dashboard main area, but did **not** add note/file/image items — that would be inventing content. Notes, Files, Images stay at 0
+- `lastUsedAt` uses fixed ISO timestamps rather than offsets from `now()`, so re-running doesn't reshuffle Recent. `emailVerified` is the one non-deterministic column, per spec
+- Item tags use `set` on update rather than `connect`, so editing the seed file and re-running drops removed tags instead of accumulating them
+- `scripts/test-db.ts` grew a "Demo working set" section: password verifies via bcrypt `compare`, hash is 12 rounds, counts match, every item has a collection and a tag, `content`/`url` agree with the type's `contentType`, link URLs are real `https://`, and nothing is soft-deleted
+- The same script now **prints** the demo data before asserting on it — a per-type histogram, every collection with its items (type, title, tags, `lastUsedAt`, content size, `P`/`*` markers for pinned and favorite), the five most recently used, and the pinned list. Reading the seed is now a `npm run db:test` away rather than a Studio session
+- 31 checks total
+- Verified: seeded twice, counts identical both times (1 user / 7 types / 5 collections / 18 items / 25 tags / 18 memberships). Type spread is 4 snippets, 3 prompts, 5 commands, 6 links. All 27 smoke-test checks pass. `npm run lint`, `npm run build`, `npx tsc --noEmit` clean
+- The demo password is a dev credential. Seeding is manual, so keeping it off the prod branch is discipline, not automation
