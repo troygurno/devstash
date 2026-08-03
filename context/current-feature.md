@@ -10,7 +10,7 @@ Spec: @context/features/dashboard-phase-3-spec.md
 
 ## Status
 
-Built — awaiting browser sign-off
+Completed
 
 ## Goals
 
@@ -118,4 +118,5 @@ Answered during implementation. All three are one-line reversals if you disagree
 - Item rows show **`createdAt`**, not `updatedAt` — the screenshot's "API Error Handling Pattern" reads Jan 12, its creation date, against a Jan 20 update
 - **Second lint fix in as many phases:** `react-hooks/static-components` rejects `const Icon = getItemTypeIcon(...)` in a component body, though the identical lookup inside a `.map()` callback in `AppSidebar` and `CollectionCard` passes. `ItemRow` returns the element from a plain `renderTypeIcon()` function instead
 - Verified: `npm run lint`, `npm run build`, `npx tsc --noEmit` clean. Served HTML confirms the four stat values (85 / 6 / 3 / 3), six collection cards in `updatedAt` order, 14 item rows split 4 pinned + 10 recent with no overlap, and all seven type tints
-- **Not verified:** still no browser automation, so hover states, the responsive breakpoints, and the overall visual match against the screenshot are unchecked
+- **Not verified by me:** no browser automation this session, so hover states, the responsive breakpoints, and the overall visual match against the screenshot went unchecked on my side. Signed off by Troy on 2026-08-03, closing phases 2 and 3
+- Merged to `main` as `40f0911` and pushed. Completes the three-phase dashboard UI
