@@ -17,8 +17,7 @@ Spec: @context/features/stats-sidebar-spec.md
 
 ## Status
 
-Complete — built and verified on branch `feature/stats-sidebar`. Not yet committed or
-merged; the History entry below gets its commit and merge SHAs when it is.
+Complete — merged to `main` as `4398273` and pushed
 
 ## Goals
 
@@ -317,5 +316,6 @@ merged; the History entry below gets its commit and merge SHAs when it is.
   code-read only — exercising them needs an empty database. No browser automation this
   session, so the dot's weight against the star, collapse-to-icon on the new "View all
   collections" row, and hover states went unchecked, same as every round since phase 2
+- Merged to `main` as `4398273` (feature commit `56d214c`) and pushed; branch deleted
 - Carried forward: the flat "Aug 3" item date from the unseeded `Item.createdAt`, and
   the prod Neon branch with no migrations applied and no seed
