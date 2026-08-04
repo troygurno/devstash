@@ -1,10 +1,10 @@
 /**
  * Presentation lookups for item types.
  *
- * `mock-data.ts` (and later the ItemType table) stores an icon as a lucide *name*
- * and a color as a *hex string* — neither can be rendered directly. These maps turn
- * them into a component and a Tailwind class. The hex in the data stays the
- * documented source of truth; the class here is what actually paints.
+ * The ItemType table stores an icon as a lucide *name* and a color as a *hex
+ * string* — neither can be rendered directly. These maps turn them into a
+ * component and a Tailwind class. The hex in the database stays the documented
+ * source of truth; the class here is what actually paints.
  */
 import {
   Code,
@@ -17,7 +17,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-/** lucide icon name → component. Keyed by `MockItemType.icon`. */
+/** lucide icon name → component. Keyed by `ItemType.icon`. */
 const ITEM_TYPE_ICONS: Record<string, LucideIcon> = {
   Code,
   Sparkles,
@@ -66,6 +66,34 @@ const ITEM_TYPE_BG_CLASSES: Record<string, string> = {
   images: "bg-pink-500/10",
 };
 
+/**
+ * Type slug → solid dot color, for the dominant-type marker on a sidebar row.
+ * Distinct from the tile tints above: at 8px a `/10` fill reads as nothing.
+ */
+const ITEM_TYPE_DOT_CLASSES: Record<string, string> = {
+  snippets: "bg-blue-500",
+  prompts: "bg-violet-500",
+  commands: "bg-orange-500",
+  notes: "bg-yellow-300",
+  links: "bg-emerald-500",
+  files: "bg-gray-500",
+  images: "bg-pink-500",
+};
+
+/**
+ * Type slug → plural label. `ItemType.name` is singular ("Snippet") because it
+ * names one item; a nav entry standing for a whole category reads as "Snippets".
+ */
+const ITEM_TYPE_PLURAL_LABELS: Record<string, string> = {
+  snippets: "Snippets",
+  prompts: "Prompts",
+  commands: "Commands",
+  notes: "Notes",
+  links: "Links",
+  files: "Files",
+  images: "Images",
+};
+
 /** Falls back to a generic file icon for a name we don't recognize. */
 export function getItemTypeIcon(iconName: string): LucideIcon {
   return ITEM_TYPE_ICONS[iconName] ?? FileIcon;
@@ -82,4 +110,14 @@ export function getItemTypeBorderClass(slug: string): string {
 
 export function getItemTypeBgClass(slug: string): string {
   return ITEM_TYPE_BG_CLASSES[slug] ?? "bg-muted";
+}
+
+/** Falls back to a neutral dot — an empty collection has no dominant type. */
+export function getItemTypeDotClass(slug: string): string {
+  return ITEM_TYPE_DOT_CLASSES[slug] ?? "bg-muted-foreground/40";
+}
+
+/** Falls back to the stored name, which is what a custom type will have. */
+export function getItemTypePluralLabel(slug: string, name: string): string {
+  return ITEM_TYPE_PLURAL_LABELS[slug] ?? name;
 }
