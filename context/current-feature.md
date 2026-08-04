@@ -1,94 +1,111 @@
 # Current Feature
 
-**Dashboard items — real data from Postgres**
+**Stats & sidebar — the last of the mock data**
 
-Move the Pinned and Recent sections of the dashboard main area off
-@src/lib/mock-data.ts and onto the seeded Neon database via Prisma. The rows should
-look exactly as they do now — same cards, same layout — but titles, descriptions,
-tags, type icon and left border, pin/star markers, and the date all come from real
-rows.
+Move @src/components/layout/AppSidebar.tsx off @src/lib/mock-data.ts and onto
+Postgres. The Types list gets the seven real `ItemType` rows with real per-type item
+counts; the Collections section gets real favorites and real recents, a
+"View all collections" link, and — on the Recent rows only — a colored dot for the
+collection's most-used item type in place of the count badge. Favorites keep the
+amber star.
 
-Pinned renders nothing at all when there are no pinned items. Collections already
-came off mock data last round; the sidebar stays out of scope.
+The layout stays exactly as it is. This closes the two inconsistencies carried since
+the collections round: the sidebar's per-type counts summing to **85** against a real
+**18** on the stat card, and six mock collections rendering beside five real ones.
 
-Spec: @context/features/dashboard-items-spec.md
+Spec: @context/features/stats-sidebar-spec.md
 
 ## Status
 
-Complete — merged to `main` as `7ad97c4` and pushed
+Complete — built and verified on branch `feature/stats-sidebar`. Not yet committed or
+merged; the History entry below gets its commit and merge SHAs when it is.
 
 ## Goals
 
-- [x] `src/lib/db/items.ts` — the only place the dashboard's item queries live,
-      mirroring the shape of @src/lib/db/collections.ts
-- [x] Pinned items and recent items as separate queries, plus the item figures for
-      `StatsCards`
-- [x] Fetch directly in the server component (@src/app/dashboard/page.tsx); no route
-      handler, no Server Action — this is a read
-- [x] Item type joined in the query, so the card's icon, background tint, and left
-      border resolve from real `ItemType` rows rather than `mockItemTypesById`
-- [x] Tags included per item — one query, not one per row
-- [x] Rework `ItemRow` to take a `DashboardItem` instead of `MockItem`; `description`
-      and `lastUsedAt` are nullable on the real model, `tags` are relations rather
-      than strings
-- [x] Update the item figures in `StatsCards` (Items, Favorite Items)
-- [x] Filter `deletedAt: null`; keep the existing `RECENT_ITEM_LIMIT` of 10 and the
-      rule that Recent excludes what Pinned already shows
-- [x] Pinned section hidden entirely when empty; Recent gets an empty state
+- [x] `getItemTypeCounts(userId)` in @src/lib/db/items.ts — all seven types with a
+      real item count each, including the types holding zero
+- [x] `getSidebarCollections(userId)` in @src/lib/db/collections.ts — favorites and
+      recents, each recent carrying its dominant type for the dot
+- [x] `AppSidebar` becomes an async server component fetching its own data; the
+      module-scope `favoriteCollections` / `recentCollections` constants go away
+- [x] Types render from real rows: icon, name, `/items/[slug]` href, real count
+- [x] Collections render real rows — Favorites with the star badge, Recent with a
+      dominant-type dot
+- [x] "View all collections" link under the collections list → `/collections`
+- [x] `getItemTypeDotClass` in @src/lib/item-types.ts — a solid dot color, not the
+      `/10` tint `getItemTypeBgClass` returns
+- [x] Filter `deletedAt: null` everywhere; keep `RECENT_COLLECTION_COUNT` at 5
+- [x] Empty states: no favorites and no collections at all both render sensibly
+- [x] Delete @src/lib/mock-data.ts once nothing imports it
 - [x] Verify: `npm run lint`, `npm run build`, `npx tsc --noEmit` clean, and the
-      served HTML checked row by row
+      served HTML checked entry by entry
 
 ## Open Questions
 
-| #   | Question                                                       | Resolution                                                                                                                                                                                       |
-| --- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1   | "Update collection stats display" again — what's left?         | **Items and Favorite Items.** Both are real counts now, `mockItemTypes`/`mockItems` are gone from `StatsCards`, and all four figures on the card come from Postgres.                                |
-| 2   | Items stat: sum of per-type counts, or a real `Item` count?     | **Real `count`** — reads **18**, down from mock data's invented 85. The sidebar's per-type counts still total 85, so the card and the sidebar now disagree by design until the sidebar moves.       |
-| 3   | What orders Recent — `lastUsedAt` or `updatedAt`?              | **`lastUsedAt` desc, nulls last, `createdAt` desc as the tiebreak.** A never-used item still sorts in rather than dropping out — hiding it would leave Recent looking empty on a stash that isn't. The seed sets `lastUsedAt` on all 18, so nulls-last isn't exercised by this data. |
-| 4   | Does the row date stay `createdAt`?                            | **Yes, unchanged** — phase 3 chose it deliberately and nothing here overrode it. The consequence shipped as-is: the seed never sets `Item.createdAt`, so all 13 rows read the same "Aug 3". See the first note below; still open as a follow-up, not as a blocker. |
-| 5   | Tag order on a row?                                            | **Alphabetical**, ordered in the query (`orderBy: { name: "asc" }` on the nested select), so a row can't reshuffle its chips between requests.                                                     |
-| 6   | Does `mock-data.ts` survive this round?                        | **Yes, partly.** `mockCollections`, `mockItemTypes`, and `mockUser` still feed @src/components/layout/AppSidebar.tsx. `mockItems`, `mockItemTypesById`, and the `MockItem` type are now orphaned — left in place rather than deleted, since the sidebar follow-up is the natural time to clear the file out. |
-| 7   | Recent excludes pinned — by id, or by `isPinned: false`?       | **`isPinned: false` in the where clause.** Pinned is uncapped, so it always shows every pinned row and a flag filter is exact; it also keeps the two queries independent enough to run in parallel. Revisit if Pinned ever gets a limit. |
+| #   | Question                                                        | Resolution                                                                                                                                                                                                                                                                    |
+| --- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | The spec's first requirement — main-area stats from the database | **Already shipped.** `StatsCards` came off `mock-data.ts` entirely last round; all four figures are real counts. The only stat surface left on mock data is the sidebar's per-type badges, so that's what "stats" means here.                                                     |
+| 2   | The spec says "create `src/lib/db/items.ts`"                     | **It exists** — `getPinnedItems`, `getRecentItems`, `getItemStats`. This round **adds to** it rather than creating it.                                                                                                                                                          |
+| 3   | `/items/[typename]` or `/items/[typeSlug]`?                      | **Slug**, which is what the sidebar already links and what the route table in @context/project-overview.md §7 specifies. The page itself still doesn't exist; the href stays correct-but-dead, same as now.                                                                       |
+| 4   | Per-type counts — raw SQL, or Prisma?                            | **Prisma `groupBy`.** `itemTypeId` is a column on `Item`, so the count is one hop, not the two that forced `$queryRaw` in `collections.ts`. Types with zero items don't come back from a group-by, so all seven come from `itemType.findMany` and the counts merge in JS.        |
+| 5   | Does the sidebar fetch, or take props from the layout?           | **Fetches itself**, as an async server component. It renders from @src/app/dashboard/layout.tsx, not from the page, and threading props through the layout buys nothing. Cost: its collection query is separate from the page's — different shape and limit, so no sharing anyway. |
+| 6   | Dominant type on a Recent row — reuse `getRecentCollections`?    | **Reuse the derivation, not the function.** The sidebar needs name + dominant type for 5 rows and nothing else; `DashboardCollection` also carries `description`, `itemCount`, and the full `types` array for the cards. A separate leaner query in the same file.                |
+| 7   | Do Recent rows lose their count badge?                           | **Yes** — the spec puts the dot there and the badge slot holds one thing. Favorites keep the star, Recent gets the dot, neither shows a number. Flagging it because it's a small loss of information the current sidebar has.                                                     |
+| 8   | Dot color for a collection with no items?                        | **Neutral** — `bg-muted-foreground/40`, matching how `CollectionCard` falls back when `dominantType` is null. The seed has no empty collections, so this is code-read only again.                                                                                                |
+| 9   | Does the footer user come off `mockUser` too?                    | **Yes** — `getCurrentUser()` sits beside `getCurrentUserId` in @src/lib/db/user.ts and the footer reads **Demo User / demo@devstash.io** instead of John Doe. Outside the spec's bullets, but `mock-data.ts` couldn't be deleted while the footer imported it. Built on the recommendation without an explicit answer — **flagging it as the one call made unilaterally.** |
+| 10  | `ItemType.name` is singular, the sidebar labels were plural       | **A slug → plural label map** in `item-types.ts`, alongside the four maps already keyed the same way. The seed stores "Snippet"; a nav row standing for a category reads "Snippets", which is what the sidebar showed on mock data. Falls back to the stored name for a slug it doesn't know, so a custom type renders as named. |
+| 11  | Favorites order in the sidebar?                                   | **Alphabetical.** A hand-curated list shouldn't reorder itself whenever an item is added — that's what the Recent list below it is for.                                                                                                                                                        |
 
 ## Notes
 
-- **The date column regressed to a single value and it's the seed's fault, not the
-  query's.** `prisma/seed.ts` never sets `Item.createdAt`, so all 18 rows default to
-  `now()` at seed time and every row on the dashboard reads **"Aug 3"**. Mock data
-  spanned Jan–Jul, and `context/screenshots/dashboard-ui-main.png` shows varied
-  dates. Shipped as-is — the query is correct and the data is flat. Three ways out
-  when it's worth fixing, none of them in this spec's scope: leave it and let real
-  items diverge naturally, switch the column to `lastUsedAt` (which does vary — Aug 3
-  down to Jul 24), or add `createdAt` to the seed. **Open follow-up.**
-- No raw SQL this round. `findMany` with a nested `select` on `itemType` and `tags`
-  is a join in one round trip, so the `::int` / `ANY(...::text[])` casts that
-  `collections.ts` needs never came up.
-- `DASHBOARD_ITEM_SELECT` is shared by both list queries so Pinned and Recent can't
-  drift apart, with an `ItemRowResult` interface describing what it returns. Typing
-  it off the generated `Prisma.ItemSelect` would be tighter but drags the namespace
-  import into a file that otherwise only needs the client.
-- `formatShortDate` now takes `Date | string`. Prisma hands back `Date`, and
-  `<time dateTime>` needs `.toISOString()` — a bare `Date` renders as
-  "Mon Aug 03 2026 …" in the attribute.
-- Five queries now fire per dashboard load — user, then collections, collection
-  stats, pinned, recent, and item stats in one `Promise.all`. Application time is
-  roughly unchanged from the collections round because the four new ones overlap.
-- Carried in and now wider: the sidebar's per-type counts total **85** against a real
-  **18** on the stat card, and it still lists six mock collections beside five real
-  ones. The sidebar follow-up closes both.
-- The seed holds 18 items across 4 types, so **notes, files, and images render
-  nowhere** — four of the seven type tints are unexercised on screen, and the yellow
-  contrast warning in @context/project-overview.md §4 is still untested in practice.
-- Served HTML verified row by row: stats **18 / 5 / 6 / 3**; Pinned renders 3 rows
-  (useDebounce hook, Code review system prompt, Multi-stage Dockerfile) in
-  `lastUsedAt` desc order, each with the pin marker; Recent renders 10 of the 15
-  unpinned rows with no overlap, correct desc order, and the five least-recently-used
-  links/commands correctly cut; all 13 descriptions present; borders and icon tiles
-  correct per type (blue/Code, violet/Sparkles, orange/Terminal, emerald/Link); tags
-  alphabetical on every row.
-- **Not verified:** the two empty states are code-read only — exercising them needs an
-  empty database or a soft-delete sweep. No browser automation this session either, so
-  hover states and responsive breakpoints went unchecked, same as the last two rounds.
+- **The two carried inconsistencies are closed.** The sidebar's per-type counts now
+  total **18**, matching the Items stat card exactly, and the five collections in the
+  sidebar are the same five the main area renders.
+- `rankTypesByCollection` and `pickDominantType` were extracted out of
+  `getRecentCollections` so the sidebar shares the derivation rather than duplicating
+  the raw SQL. `getRecentCollections`'s behavior is unchanged — same ordering, same
+  `defaultTypeId` tiebreak, same neutral fallback — it just reads the ranked rows from
+  the helper now.
+- Per-type counts are a **Prisma `groupBy`**, no raw SQL. `itemTypeId` is a column on
+  `Item`, so it's one hop; the `$queryRaw` in `collections.ts` exists only because
+  that count is keyed on `(collectionId, itemTypeId)` two hops out.
+- `getItemTypeCounts` scopes to `userId: null OR userId` — system types plus the
+  user's own. Custom types are a later Pro feature, so today that's always the seven
+  seeded rows, but the query is already right when they land.
+- The seed's shape is now honest on screen: **Notes, Files, and Images read a real 0**
+  where mock data invented 12 / 5 / 3. This is also the first live outing for the
+  yellow Note color — on a badge, which is the use @context/project-overview.md §4
+  says the color is safe for.
+- The dot needed its own map. `getItemTypeBgClass` returns `bg-*/10`, a tile tint that
+  disappears at 8px; `getItemTypeDotClass` returns the solid `bg-blue-500` form and
+  falls back to `bg-muted-foreground/40` when a collection has no dominant type.
+- Sidebar rendering from the layout means it queries on every dashboard route, not
+  just `/dashboard`. Fine today — one route exists. Worth remembering when `/items`
+  and `/collections` land.
+- Seven queries per dashboard load now: the sidebar's three (user, type counts +
+  types, collections + the grouped count) plus the page's five, all overlapping inside
+  two `Promise.all`s. The sidebar's collection query is deliberately separate from the
+  page's — different shape, different limit.
+- Verified against the running dev server, entry by entry. **Types:** Snippets 4,
+  Prompts 3, Commands 5, Notes 0, Links 6, Files 0, Images 0 — 18 total, and all seven
+  hrefs resolve to `/items/<slug>`. **Favorites:** AI Workflows, React Patterns,
+  Terminal Commands, alphabetical, each with the amber star. **Recent:** Design
+  Resources, Terminal Commands, DevOps, AI Workflows, React Patterns in `updatedAt`
+  desc, with dots emerald / orange / emerald / violet / blue — matching the dominant
+  types the collection cards resolved last round. **Footer:** `DU`, Demo User,
+  demo@devstash.io. Stat cards unchanged at 18 / 5 / 6 / 3.
+- **Not verified:** the three empty states (no favorites, no collections, no user) are
+  code-read only — exercising them needs an empty database. No browser automation this
+  session either, so the dot's size against the star, collapse-to-icon behavior for the
+  new "View all collections" row, and hover states went unchecked, same as every round
+  since phase 2.
+- Recent rows traded their count badge for the dot, since the badge slot holds one
+  thing. Favorites show a star and no number, Recent shows a dot and no number — the
+  sidebar no longer states a collection's size anywhere. The cards in the main area
+  still do.
+- Carried in and unchanged: the row date on the dashboard reads the same "Aug 3" on
+  every item because `prisma/seed.ts` never sets `Item.createdAt`. Not in this spec's
+  scope; still an open follow-up.
 - The prod Neon branch still has **no migrations applied** and no seed.
 
 ## History
@@ -227,3 +244,78 @@ Complete — merged to `main` as `7ad97c4` and pushed
 - The seed holds 18 items across 4 types, so notes, files, and images render nowhere — four of the seven type tints are unexercised on screen
 - Merged to `main` as `7ad97c4` (feature commit `149f290`) and pushed; branch deleted
 - Carried forward: the prod Neon branch still has no migrations applied and no seed
+
+### 2026-08-04 — Stats & sidebar from Postgres
+
+- Branch `feature/stats-sidebar`
+- **The spec was two-thirds already built.** Its "display stats from database data"
+  bullet closed last round when `StatsCards` came off mock data, and its "create
+  `src/lib/db/items.ts`" bullet described a file that already existed. What remained
+  was the sidebar, which was the last thing in the app still reading `mock-data.ts`
+- `getItemTypeCounts(userId)` added to `src/lib/db/items.ts` — a Prisma **`groupBy`**,
+  no raw SQL. `itemTypeId` is a column on `Item`, so the count is one hop; the
+  `$queryRaw` in `collections.ts` exists only because *its* count keys on
+  `(collectionId, itemTypeId)` two hops out. A type holding nothing doesn't come back
+  from a group at all, so the seven types are fetched separately and the counts merge
+  onto them rather than the other way round
+- The type query scopes to `userId: null OR userId` — system types plus the user's
+  own. Custom types are a later Pro feature, so today it always returns the seven
+  seeded rows, but the query is already correct when they land
+- `getSidebarCollections(userId, recentLimit)` added to `src/lib/db/collections.ts`,
+  returning `{ favorites, recent }`. Favorites sort **alphabetically** — a
+  hand-curated list shouldn't reorder itself whenever an item is added, which is what
+  the Recent list beneath it is for
+- **Extracted `rankTypesByCollection` and `pickDominantType`** out of
+  `getRecentCollections` so the sidebar shares the derivation instead of duplicating
+  the raw SQL. `getRecentCollections` behaves identically — same ordering, same
+  `defaultTypeId` tiebreak, same neutral fallback — it just reads ranked rows from the
+  helper now. The sidebar's two lists are unioned before the breakdown runs, keeping
+  it to one grouped query rather than one per list
+- `AppSidebar` became an **async server component** fetching its own data. It renders
+  from the layout, not the page, so threading props through would have bought nothing.
+  Cost: it queries on every dashboard route, which matters once `/items` and
+  `/collections` exist
+- `getItemTypeDotClass` added to `item-types.ts` as its own map. `getItemTypeBgClass`
+  returns `bg-*/10`, a tile tint that disappears at 8px; the dot needs the solid
+  `bg-blue-500` form, falling back to `bg-muted-foreground/40` for a collection with
+  no dominant type
+- **`ItemType.name` is singular in the seed** ("Snippet") where the sidebar showed
+  plural. Added a slug → plural label map beside the four maps already keyed that way,
+  falling back to the stored name so a custom type renders as named
+- Recent rows traded the count badge for the dot — the badge slot holds one thing.
+  Favorites show a star and no number, Recent a dot and no number, so **the sidebar no
+  longer states a collection's size anywhere**. The main-area cards still do
+- `getCurrentUser()` added beside `getCurrentUserId` in `src/lib/db/user.ts`; the
+  footer reads Demo User / demo@devstash.io instead of John Doe. Outside the spec's
+  bullets, but `mock-data.ts` couldn't be deleted while the footer imported it — the
+  one call made without an explicit answer from Troy
+- **`src/lib/mock-data.ts` deleted.** Nothing in `src/` imports it; the stale
+  references left in `item-types.ts` and `StatsCards.tsx` comments were cleaned up
+  with it. The app is now entirely on Postgres
+- Seven queries per dashboard load: the sidebar's three (user, then type counts and
+  collections) plus the page's five, overlapping inside two `Promise.all`s. The
+  sidebar's collection query is deliberately separate from the page's — different
+  shape, different limit
+- **Both carried inconsistencies are closed.** Per-type counts total **18** against
+  the Items stat card's 18, where they read 85 before, and the sidebar lists the same
+  five collections the main area renders instead of six invented ones
+- Notes, Files, and Images now read a real **0** where mock data invented 12 / 5 / 3 —
+  the first honest showing of the seed's shape, and the first live outing for the
+  yellow Note color, on a badge, which is the use `project-overview.md` §4 says it's
+  safe for
+- Verified: `npm run lint`, `npm run build`, `npx tsc --noEmit` clean. Served HTML
+  checked entry by entry — Types read 4 / 3 / 5 / 0 / 6 / 0 / 0 with all seven hrefs
+  resolving to `/items/<slug>`; Favorites are AI Workflows, React Patterns, Terminal
+  Commands with amber stars; Recent is Design Resources, Terminal Commands, DevOps, AI
+  Workflows, React Patterns in `updatedAt` desc with dots emerald / orange / emerald /
+  violet / blue, matching the dominant types the cards resolved last round; footer
+  reads `DU` / Demo User / demo@devstash.io; stat cards unchanged at 18 / 5 / 6 / 3
+- A dev server was already running on :3000 for this directory, so Next refused a
+  second instance and verification ran against that one — it picked the changes up via
+  HMR with no restart
+- **Not verified:** the three empty states (no favorites, no collections, no user) are
+  code-read only — exercising them needs an empty database. No browser automation this
+  session, so the dot's weight against the star, collapse-to-icon on the new "View all
+  collections" row, and hover states went unchecked, same as every round since phase 2
+- Carried forward: the flat "Aug 3" item date from the unseeded `Item.createdAt`, and
+  the prod Neon branch with no migrations applied and no seed

@@ -4,11 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import type { CollectionStats } from "@/lib/db/collections";
 import type { ItemStats } from "@/lib/db/items";
 
-/**
- * All four figures are real counts now. The sidebar's per-type item counts are
- * still mock, so "Items 18" here sits beside per-type counts summing to 85 in the
- * sidebar — that gap closes when the sidebar moves off `mock-data.ts`.
- */
+/** All four figures are real counts, matching the sidebar's per-type totals. */
 export function StatsCards({
   items,
   collections,

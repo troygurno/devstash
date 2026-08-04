@@ -35,6 +35,12 @@ export interface ItemStats {
   favorites: number;
 }
 
+/** A type as the sidebar lists it — an accent plus how many items sit under it. */
+export interface ItemTypeCount extends ItemTypeAccent {
+  /** Items the user holds of this type. Zero for a type they've never used. */
+  count: number;
+}
+
 /**
  * One select for both list queries, so Pinned and Recent can't drift apart.
  * `tags` and `itemType` are relations — Prisma resolves them in the same round
@@ -111,6 +117,42 @@ export async function getItemStats(userId: string): Promise<ItemStats> {
   ]);
 
   return { total, favorites };
+}
+
+/**
+ * Every type the user can see, in sidebar order, each with a real item count.
+ *
+ * `itemTypeId` is a column on `Item`, so the count is a one-hop `groupBy` — none
+ * of the raw SQL `collections.ts` needs applies here. A type holding nothing
+ * doesn't come back from the group at all, which is why the type list is fetched
+ * separately and the counts merge onto it rather than the other way round.
+ */
+export async function getItemTypeCounts(
+  userId: string,
+): Promise<ItemTypeCount[]> {
+  const [types, counts] = await Promise.all([
+    prisma.itemType.findMany({
+      // System types plus this user's own. Custom types don't exist yet, so
+      // today this is always the seven seeded rows.
+      where: { OR: [{ userId: null }, { userId }] },
+      orderBy: { sortOrder: "asc" },
+      select: { id: true, name: true, slug: true, icon: true },
+    }),
+    prisma.item.groupBy({
+      by: ["itemTypeId"],
+      where: { userId, deletedAt: null },
+      _count: { _all: true },
+    }),
+  ]);
+
+  const countByTypeId = new Map(
+    counts.map((row) => [row.itemTypeId, row._count._all]),
+  );
+
+  return types.map((type) => ({
+    ...type,
+    count: countByTypeId.get(type.id) ?? 0,
+  }));
 }
 
 function toDashboardItem(item: ItemRowResult): DashboardItem {
