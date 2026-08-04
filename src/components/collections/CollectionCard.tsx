@@ -8,31 +8,29 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import type { DashboardCollection } from "@/lib/db/collections";
 import {
   getItemTypeBorderClass,
   getItemTypeColorClass,
   getItemTypeIcon,
 } from "@/lib/item-types";
 import { cn } from "@/lib/utils";
-import { mockItemTypesById, type MockCollection } from "@/lib/mock-data";
 
 /**
- * The accent stripe comes from `dominantTypeId`, which the mock data carries
- * directly. Against a real database this is a grouped count in the query, not a
- * client-side tally — see the collection card color rule in project-overview.md.
+ * The accent stripe comes from `dominantType` — the type the collection holds
+ * most of, resolved by a grouped count in the query. An empty collection has no
+ * dominant type and falls back to the neutral border.
  */
 export function CollectionCard({
   collection,
 }: {
-  collection: MockCollection;
+  collection: DashboardCollection;
 }) {
-  const dominantType = mockItemTypesById[collection.dominantTypeId];
-
   return (
     <Card
       className={cn(
         "border-l-4 transition-colors hover:ring-foreground/20",
-        getItemTypeBorderClass(dominantType?.slug ?? ""),
+        getItemTypeBorderClass(collection.dominantType?.slug ?? ""),
       )}
     >
       <CardHeader>
@@ -47,21 +45,23 @@ export function CollectionCard({
             />
           ) : null}
         </CardTitle>
-        <CardDescription>{collection.itemCount} items</CardDescription>
+        <CardDescription>
+          {collection.itemCount} {collection.itemCount === 1 ? "item" : "items"}
+        </CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-3">
-        <p className="text-sm text-muted-foreground">
-          {collection.description}
-        </p>
+        {collection.description ? (
+          <p className="text-sm text-muted-foreground">
+            {collection.description}
+          </p>
+        ) : null}
         <div className="flex items-center gap-2">
-          {collection.typeIds.map((typeId) => {
-            const type = mockItemTypesById[typeId];
-            if (!type) return null;
+          {collection.types.map((type) => {
             const Icon = getItemTypeIcon(type.icon);
             return (
               <Icon
-                key={typeId}
+                key={type.id}
                 aria-label={type.name}
                 className={cn("size-4", getItemTypeColorClass(type.slug))}
               />
