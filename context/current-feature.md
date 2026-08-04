@@ -15,8 +15,7 @@ Spec: @context/features/dashboard-items-spec.md
 
 ## Status
 
-Complete — implemented and verified on `feature/dashboard-items`. Not yet committed
-or merged; the branch is still checked out with the working tree dirty.
+Complete — merged to `main` as `7ad97c4` and pushed
 
 ## Goals
 
@@ -226,4 +225,5 @@ or merged; the branch is still checked out with the working tree dirty.
 - Left orphaned rather than deleted: `mockItems`, `mockItemTypesById`, and the `MockItem` type in `src/lib/mock-data.ts`. Nothing imports them now; the sidebar follow-up is the natural time to clear the file out. `mockCollections`, `mockItemTypes`, and `mockUser` are still live in `AppSidebar`
 - **Known inconsistency, now wider:** the sidebar's per-type item counts total 85 against a real 18 on the stat card, and it still lists six mock collections beside five real ones
 - The seed holds 18 items across 4 types, so notes, files, and images render nowhere — four of the seven type tints are unexercised on screen
+- Merged to `main` as `7ad97c4` (feature commit `149f290`) and pushed; branch deleted
 - Carried forward: the prod Neon branch still has no migrations applied and no seed
