@@ -1,84 +1,95 @@
 # Current Feature
 
-**Dashboard collections — real data from Postgres**
+**Dashboard items — real data from Postgres**
 
-Move the Collections section of the dashboard main area off @src/lib/mock-data.ts and
-onto the seeded Neon database via Prisma. The grid should look exactly as it does
-now — same cards, same layout — but the names, descriptions, item counts, favorite
-stars, accent border, and type icons all come from real rows.
+Move the Pinned and Recent sections of the dashboard main area off
+@src/lib/mock-data.ts and onto the seeded Neon database via Prisma. The rows should
+look exactly as they do now — same cards, same layout — but titles, descriptions,
+tags, type icon and left border, pin/star markers, and the date all come from real
+rows.
 
-Items stay on mock data this round; the Pinned and Recent sections are explicitly out
-of scope.
+Pinned renders nothing at all when there are no pinned items. Collections already
+came off mock data last round; the sidebar stays out of scope.
 
-Spec: @context/features/dashboard-collections-spec.md
+Spec: @context/features/dashboard-items-spec.md
 
 ## Status
 
-Complete — merged to `main` as `e798cac` and pushed
+Complete — implemented and verified on `feature/dashboard-items`. Not yet committed
+or merged; the branch is still checked out with the working tree dirty.
 
 ## Goals
 
-- [x] `src/lib/db/collections.ts` — `getRecentCollections` and `getCollectionStats`,
-      the only place the dashboard's collection queries live
+- [x] `src/lib/db/items.ts` — the only place the dashboard's item queries live,
+      mirroring the shape of @src/lib/db/collections.ts
+- [x] Pinned items and recent items as separate queries, plus the item figures for
+      `StatsCards`
 - [x] Fetch directly in the server component (@src/app/dashboard/page.tsx); no route
       handler, no Server Action — this is a read
-- [x] Per-collection item count, computed in the query rather than by loading items
-- [x] Dominant type per collection → the card's left border color, from a grouped
-      count in the query (see the collection card color rule in
-      @context/project-overview.md §11)
-- [x] Distinct type icons per collection, rendered as the small icon row on the card
-- [x] Rework `CollectionCard` to take `DashboardCollection` instead of
-      `MockCollection`, resolving types from the query result rather than
-      `mockItemTypesById`
-- [x] Update the collections figures in `StatsCards`
-- [x] Filter `deletedAt: null`; sort by `updatedAt` desc; cap at the existing
-      `COLLECTION_LIMIT` of 6
-- [x] Empty state — the seed has collections, but the query must not assume it
+- [x] Item type joined in the query, so the card's icon, background tint, and left
+      border resolve from real `ItemType` rows rather than `mockItemTypesById`
+- [x] Tags included per item — one query, not one per row
+- [x] Rework `ItemRow` to take a `DashboardItem` instead of `MockItem`; `description`
+      and `lastUsedAt` are nullable on the real model, `tags` are relations rather
+      than strings
+- [x] Update the item figures in `StatsCards` (Items, Favorite Items)
+- [x] Filter `deletedAt: null`; keep the existing `RECENT_ITEM_LIMIT` of 10 and the
+      rule that Recent excludes what Pinned already shows
+- [x] Pinned section hidden entirely when empty; Recent gets an empty state
 - [x] Verify: `npm run lint`, `npm run build`, `npx tsc --noEmit` clean, and the
-      served HTML checked card by card
+      served HTML checked row by row
 
 ## Open Questions
 
-| #   | Question                                                       | Resolution                                                                                                                                                                                                                          |
-| --- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Which user's collections, with no auth yet?                    | **Demo user by email**, behind `getCurrentUserId()` in a new @src/lib/db/user.ts. One function to replace when Auth.js lands, rather than a `where: { userId }` sweep. Returns null on an unseeded database and the page renders empty. |
-| 2   | "Update collection stats display" — how far does that reach?   | **Collections and Favorite Collections only.** Items are out of scope by the spec's own line, so Items / Favorite Items stay on mock data. `StatsCards` now takes a `collections` prop and keeps the two item figures internal.        |
-| 3   | Dominant type: one grouped query, or one query per collection? | **One `$queryRaw` grouped by `(collectionId, itemTypeId)`.** Prisma's `groupBy` can't reach `Item.itemTypeId` through `ItemCollection`, and the alternative — loading membership rows and tallying in JS — is what §11 warns against.  |
-| 4   | Ties on dominant type?                                         | **`defaultTypeId` first, then lowest `sortOrder`.** The seed *does* set `defaultTypeId` on all five collections, so the documented tiebreak is live; `sortOrder` is the second tier so the border can't flip between requests.         |
-| 5   | Does the icon row cap?                                         | **No cap.** Seeded collections top out at 3 distinct types and seven 16px icons still fit the card. Revisit if a collection ever spans all seven.                                                                                     |
+| #   | Question                                                       | Resolution                                                                                                                                                                                       |
+| --- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | "Update collection stats display" again — what's left?         | **Items and Favorite Items.** Both are real counts now, `mockItemTypes`/`mockItems` are gone from `StatsCards`, and all four figures on the card come from Postgres.                                |
+| 2   | Items stat: sum of per-type counts, or a real `Item` count?     | **Real `count`** — reads **18**, down from mock data's invented 85. The sidebar's per-type counts still total 85, so the card and the sidebar now disagree by design until the sidebar moves.       |
+| 3   | What orders Recent — `lastUsedAt` or `updatedAt`?              | **`lastUsedAt` desc, nulls last, `createdAt` desc as the tiebreak.** A never-used item still sorts in rather than dropping out — hiding it would leave Recent looking empty on a stash that isn't. The seed sets `lastUsedAt` on all 18, so nulls-last isn't exercised by this data. |
+| 4   | Does the row date stay `createdAt`?                            | **Yes, unchanged** — phase 3 chose it deliberately and nothing here overrode it. The consequence shipped as-is: the seed never sets `Item.createdAt`, so all 13 rows read the same "Aug 3". See the first note below; still open as a follow-up, not as a blocker. |
+| 5   | Tag order on a row?                                            | **Alphabetical**, ordered in the query (`orderBy: { name: "asc" }` on the nested select), so a row can't reshuffle its chips between requests.                                                     |
+| 6   | Does `mock-data.ts` survive this round?                        | **Yes, partly.** `mockCollections`, `mockItemTypes`, and `mockUser` still feed @src/components/layout/AppSidebar.tsx. `mockItems`, `mockItemTypesById`, and the `MockItem` type are now orphaned — left in place rather than deleted, since the sidebar follow-up is the natural time to clear the file out. |
+| 7   | Recent excludes pinned — by id, or by `isPinned: false`?       | **`isPinned: false` in the where clause.** Pinned is uncapped, so it always shows every pinned row and a flag filter is exact; it also keeps the two queries independent enough to run in parallel. Revisit if Pinned ever gets a limit. |
 
 ## Notes
 
-- The grid renders **5** cards, not 6 — that's the seed's collection count, and
-  `COLLECTION_LIMIT = 6` is no longer the binding constraint.
-- Dominant types came out as expected: React Patterns blue, AI Workflows violet,
-  Terminal Commands orange, Design Resources emerald, and DevOps emerald — DevOps
-  holds 2 links against 1 snippet and 1 command, so links wins outright even though
-  its `defaultTypeId` is Snippet. Icon rows are ordered most-used first.
-- `COUNT(*)` is `int8`, which the Neon driver hands back as a **string**. The
-  `::int` cast in the raw query is what makes `count` a number on the JS side —
-  without it the sort and the sum both silently misbehave.
-- `= ANY(${ids}::text[])` is the parameterized form that works through the Neon
-  serverless driver; the explicit cast is needed because Postgres can't infer the
-  element type of a bare parameter.
-- Sort order is real but not meaningful yet: the seed writes all five collections
-  within ~250ms, so `updatedAt` desc is effectively reverse insertion order, and
-  the grid leads with Design Resources.
-- **First real import of @src/lib/prisma.ts.** Next bundled the client and the Neon
-  adapter without complaint — no config change, no `serverExternalPackages` entry.
-- `/dashboard` was already dynamic (`ƒ`) from the `sidebar_state` cookie read, so
-  querying didn't change its render mode.
-- Three sequential round trips to Neon (user → collections → counts+types), landing
-  around 800ms of application time on a warm dev server. Fine for now; the user
-  lookup collapses into the session once auth exists.
-- @src/lib/mock-data.ts stays, with no exports left orphaned: Pinned/Recent and
-  `ItemRow` still use `mockItems` and `mockItemTypesById`, `StatsCards` still uses
-  `mockItemTypes`, and @src/components/layout/AppSidebar.tsx still uses
-  `mockCollections`.
-- **The sidebar and the main area now disagree.** The spec scoped this to the
-  right-hand grid, so the sidebar's Favorites and Recent lists still render the six
-  mock collections — different names, different count — beside five real cards. It
-  looks wrong on screen and is worth its own follow-up.
+- **The date column regressed to a single value and it's the seed's fault, not the
+  query's.** `prisma/seed.ts` never sets `Item.createdAt`, so all 18 rows default to
+  `now()` at seed time and every row on the dashboard reads **"Aug 3"**. Mock data
+  spanned Jan–Jul, and `context/screenshots/dashboard-ui-main.png` shows varied
+  dates. Shipped as-is — the query is correct and the data is flat. Three ways out
+  when it's worth fixing, none of them in this spec's scope: leave it and let real
+  items diverge naturally, switch the column to `lastUsedAt` (which does vary — Aug 3
+  down to Jul 24), or add `createdAt` to the seed. **Open follow-up.**
+- No raw SQL this round. `findMany` with a nested `select` on `itemType` and `tags`
+  is a join in one round trip, so the `::int` / `ANY(...::text[])` casts that
+  `collections.ts` needs never came up.
+- `DASHBOARD_ITEM_SELECT` is shared by both list queries so Pinned and Recent can't
+  drift apart, with an `ItemRowResult` interface describing what it returns. Typing
+  it off the generated `Prisma.ItemSelect` would be tighter but drags the namespace
+  import into a file that otherwise only needs the client.
+- `formatShortDate` now takes `Date | string`. Prisma hands back `Date`, and
+  `<time dateTime>` needs `.toISOString()` — a bare `Date` renders as
+  "Mon Aug 03 2026 …" in the attribute.
+- Five queries now fire per dashboard load — user, then collections, collection
+  stats, pinned, recent, and item stats in one `Promise.all`. Application time is
+  roughly unchanged from the collections round because the four new ones overlap.
+- Carried in and now wider: the sidebar's per-type counts total **85** against a real
+  **18** on the stat card, and it still lists six mock collections beside five real
+  ones. The sidebar follow-up closes both.
+- The seed holds 18 items across 4 types, so **notes, files, and images render
+  nowhere** — four of the seven type tints are unexercised on screen, and the yellow
+  contrast warning in @context/project-overview.md §4 is still untested in practice.
+- Served HTML verified row by row: stats **18 / 5 / 6 / 3**; Pinned renders 3 rows
+  (useDebounce hook, Code review system prompt, Multi-stage Dockerfile) in
+  `lastUsedAt` desc order, each with the pin marker; Recent renders 10 of the 15
+  unpinned rows with no overlap, correct desc order, and the five least-recently-used
+  links/commands correctly cut; all 13 descriptions present; borders and icon tiles
+  correct per type (blue/Code, violet/Sparkles, orange/Terminal, emerald/Link); tags
+  alphabetical on every row.
+- **Not verified:** the two empty states are code-read only — exercising them needs an
+  empty database or a soft-delete sweep. No browser automation this session either, so
+  hover states and responsive breakpoints went unchecked, same as the last two rounds.
 - The prod Neon branch still has **no migrations applied** and no seed.
 
 ## History
@@ -193,4 +204,26 @@ Complete — merged to `main` as `e798cac` and pushed
 - **Known inconsistency, deliberately left:** the sidebar's Favorites and Recent lists still render the six mock collections next to five real cards. The spec scoped this to the main area; the sidebar is its own follow-up
 - Left in place: `mock-data.ts` keeps every export in use — `mockItems` and `mockItemTypesById` for Pinned/Recent and `ItemRow`, `mockItemTypes` for the item stats, `mockCollections` for the sidebar
 - Merged to `main` as `e798cac` (feature commit `2cc7c84`) and pushed
+- Carried forward: the prod Neon branch still has no migrations applied and no seed
+
+### 2026-08-04 — Dashboard items from Postgres
+
+- Branch `feature/dashboard-items`
+- `src/lib/db/items.ts` — `getPinnedItems(userId)`, `getRecentItems(userId, limit)`, and `getItemStats(userId)`. `DashboardItem` is the flattened shape `ItemRow` consumes: the joined `itemType` becomes `type`, and the tag relation collapses to a `string[]`
+- **No raw SQL this round.** `findMany` with a nested `select` on `itemType` and `tags` resolves both relations in one round trip, so the `::int` and `ANY(...::text[])` casts that `collections.ts` needs never came up. The collections work needed `$queryRaw` only because it grouped a count two hops out; a per-row join doesn't
+- One shared `DASHBOARD_ITEM_SELECT` for both list queries so Pinned and Recent can't drift apart, with an `ItemRowResult` interface describing what it returns. Typing it off the generated `Prisma.ItemSelect` would be tighter but drags the namespace import into a file that otherwise only needs the client
+- Recent orders by `lastUsedAt` desc **nulls last**, then `createdAt` desc. A never-used item sorts in at the bottom rather than dropping out — hiding it would leave Recent looking empty on a stash that isn't. The seed sets `lastUsedAt` on all 18 items, so nulls-last isn't exercised by this data
+- Recent excludes Pinned with `isPinned: false` rather than by id. Pinned is uncapped, so it always renders every pinned row and the flag filter is exact; it also keeps the queries independent enough to run in parallel. Revisit if Pinned ever gets a limit
+- Tags ordered alphabetically **in the query**, not in the component, so a row can't reshuffle its chips between requests
+- `ItemRow` swapped `MockItem` for `DashboardItem`; `description` is nullable on the real model so the paragraph renders conditionally, matching what `CollectionCard` already does
+- `StatsCards` lost its `mock-data` import entirely — all four figures are real counts now. **Items reads 18**, down from mock data's invented 85
+- `formatShortDate` widened to `Date | string`. Prisma returns `Date`, and `<time dateTime>` needs an explicit `.toISOString()` — a bare `Date` renders as "Mon Aug 03 2026 …" in the attribute
+- Pinned hides its heading along with its rows when empty, per the spec. Recent gets a dashed empty state matching the Collections one
+- Five queries per load now (user, then collections + collection stats + pinned + recent + item stats in one `Promise.all`). Application time roughly unchanged from the collections round because the four new ones overlap
+- **The date column went flat and it's a seed gap, not a query bug:** `prisma/seed.ts` never sets `Item.createdAt`, so all 18 rows default to `now()` at seed time and every row reads the same "Aug 3" where mock data spanned Jan–Jul. Shipped as-is; recorded as an open follow-up with three options (leave it, switch the column to `lastUsedAt`, or seed `createdAt`)
+- Verified: `npm run lint`, `npm run build`, `npx tsc --noEmit` clean. Served HTML checked row by row — stats 18 / 5 / 6 / 3; Pinned renders 3 rows in `lastUsedAt` desc order with pin markers; Recent renders 10 of the 15 unpinned rows with no overlap and the five least-recently-used correctly cut; all 13 descriptions present; borders and icon tiles correct per type; tags alphabetical on every row
+- **Not verified:** both empty states are code-read only — exercising them needs an empty database or a soft-delete sweep. No browser automation this session, so hover states and responsive breakpoints went unchecked, same as the previous two rounds
+- Left orphaned rather than deleted: `mockItems`, `mockItemTypesById`, and the `MockItem` type in `src/lib/mock-data.ts`. Nothing imports them now; the sidebar follow-up is the natural time to clear the file out. `mockCollections`, `mockItemTypes`, and `mockUser` are still live in `AppSidebar`
+- **Known inconsistency, now wider:** the sidebar's per-type item counts total 85 against a real 18 on the stat card, and it still lists six mock collections beside five real ones
+- The seed holds 18 items across 4 types, so notes, files, and images render nowhere — four of the seven type tints are unexercised on screen
 - Carried forward: the prod Neon branch still has no migrations applied and no seed

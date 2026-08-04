@@ -2,22 +2,24 @@ import { Folder, FolderHeart, Layers, Star } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import type { CollectionStats } from "@/lib/db/collections";
-import { mockItemTypes, mockItems } from "@/lib/mock-data";
+import type { ItemStats } from "@/lib/db/items";
 
 /**
- * The two collection figures are real; the two item figures are still mock data,
- * because items haven't moved off `mock-data.ts` yet. Until they do, "Items 85"
- * sits next to a real "Collections 5" — expected, not a bug.
- *
- * "Total items" sums the per-type counts rather than `mockItems.length`. The
- * sample array holds 14 rows while the type counts total 85, and the sidebar
- * renders those same per-type counts alongside this card.
+ * All four figures are real counts now. The sidebar's per-type item counts are
+ * still mock, so "Items 18" here sits beside per-type counts summing to 85 in the
+ * sidebar — that gap closes when the sidebar moves off `mock-data.ts`.
  */
-export function StatsCards({ collections }: { collections: CollectionStats }) {
+export function StatsCards({
+  items,
+  collections,
+}: {
+  items: ItemStats;
+  collections: CollectionStats;
+}) {
   const stats = [
     {
       label: "Items",
-      value: mockItemTypes.reduce((total, type) => total + type.itemCount, 0),
+      value: items.total,
       icon: Layers,
       className: "text-blue-500",
     },
@@ -29,7 +31,7 @@ export function StatsCards({ collections }: { collections: CollectionStats }) {
     },
     {
       label: "Favorite Items",
-      value: mockItems.filter((item) => item.isFavorite).length,
+      value: items.favorites,
       icon: Star,
       className: "text-amber-400",
     },

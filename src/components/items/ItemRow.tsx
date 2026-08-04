@@ -11,7 +11,7 @@ import {
   getItemTypeIcon,
 } from "@/lib/item-types";
 import { cn } from "@/lib/utils";
-import { mockItemTypesById, type MockItem } from "@/lib/mock-data";
+import type { DashboardItem } from "@/lib/db/items";
 
 /**
  * Resolving the icon inside the component body reads as a component created during
@@ -28,24 +28,26 @@ function renderTypeIcon(iconName: string, className: string) {
  * pinned "API Error Handling Pattern" row reads Jan 12 there, its creation date,
  * not its Jan 20 update.
  */
-export function ItemRow({ item }: { item: MockItem }) {
-  const type = mockItemTypesById[item.itemTypeId];
-  const slug = type?.slug ?? "";
+export function ItemRow({ item }: { item: DashboardItem }) {
+  const { type } = item;
 
   return (
     <Card
-      className={cn("border-l-4 transition-colors hover:ring-foreground/20", getItemTypeBorderClass(slug))}
+      className={cn(
+        "border-l-4 transition-colors hover:ring-foreground/20",
+        getItemTypeBorderClass(type.slug),
+      )}
     >
       <CardContent className="flex items-start gap-4">
         <span
           className={cn(
             "flex size-10 shrink-0 items-center justify-center rounded-lg",
-            getItemTypeBgClass(slug),
+            getItemTypeBgClass(type.slug),
           )}
         >
           {renderTypeIcon(
-            type?.icon ?? "",
-            cn("size-5", getItemTypeColorClass(slug)),
+            type.icon,
+            cn("size-5", getItemTypeColorClass(type.slug)),
           )}
         </span>
 
@@ -71,9 +73,11 @@ export function ItemRow({ item }: { item: MockItem }) {
             ) : null}
           </div>
 
-          <p className="truncate text-sm text-muted-foreground">
-            {item.description}
-          </p>
+          {item.description ? (
+            <p className="truncate text-sm text-muted-foreground">
+              {item.description}
+            </p>
+          ) : null}
 
           {item.tags.length > 0 ? (
             <div className="flex flex-wrap gap-1.5 pt-0.5">
@@ -87,7 +91,7 @@ export function ItemRow({ item }: { item: MockItem }) {
         </div>
 
         <time
-          dateTime={item.createdAt}
+          dateTime={item.createdAt.toISOString()}
           className="shrink-0 text-xs text-muted-foreground"
         >
           {formatShortDate(item.createdAt)}

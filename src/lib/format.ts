@@ -8,7 +8,7 @@ const SHORT_DATE = new Intl.DateTimeFormat("en-US", {
   day: "numeric",
 });
 
-/** "2026-01-15T10:00:00.000Z" → "Jan 15" */
-export function formatShortDate(isoDate: string): string {
-  return SHORT_DATE.format(new Date(isoDate));
+/** "2026-01-15T10:00:00.000Z" → "Jan 15". Takes a Date as it comes off Prisma. */
+export function formatShortDate(date: Date | string): string {
+  return SHORT_DATE.format(typeof date === "string" ? new Date(date) : date);
 }
