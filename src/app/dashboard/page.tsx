@@ -5,7 +5,13 @@ import { Clock, Pin } from "lucide-react";
 import { CollectionCard } from "@/components/collections/CollectionCard";
 import { StatsCards } from "@/components/dashboard/StatsCards";
 import { ItemRow } from "@/components/items/ItemRow";
-import { mockCollections, mockItems } from "@/lib/mock-data";
+import {
+  getCollectionStats,
+  getRecentCollections,
+  type CollectionStats,
+} from "@/lib/db/collections";
+import { getCurrentUserId } from "@/lib/db/user";
+import { mockItems } from "@/lib/mock-data";
 
 export const metadata: Metadata = {
   title: "Dashboard · DevStash",
@@ -14,9 +20,7 @@ export const metadata: Metadata = {
 const COLLECTION_LIMIT = 6;
 const RECENT_ITEM_LIMIT = 10;
 
-const recentCollections = [...mockCollections]
-  .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-  .slice(0, COLLECTION_LIMIT);
+const NO_COLLECTIONS: CollectionStats = { total: 0, favorites: 0 };
 
 const pinnedItems = mockItems.filter((item) => item.isPinned);
 
@@ -44,7 +48,15 @@ function SectionHeading({
   );
 }
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  // No session yet — getCurrentUserId resolves the seeded demo account and
+  // returns null against an unseeded database.
+  const userId = await getCurrentUserId();
+  const [collections, collectionStats] = await Promise.all([
+    userId ? getRecentCollections(userId, COLLECTION_LIMIT) : [],
+    userId ? getCollectionStats(userId) : NO_COLLECTIONS,
+  ]);
+
   return (
     <div className="space-y-10">
       <div className="space-y-1">
@@ -52,7 +64,7 @@ export default function DashboardPage() {
         <p className="text-muted-foreground">Your developer knowledge hub</p>
       </div>
 
-      <StatsCards />
+      <StatsCards collections={collectionStats} />
 
       <section className="space-y-4">
         <div className="flex items-center justify-between gap-4">
@@ -64,11 +76,20 @@ export default function DashboardPage() {
             View all
           </Link>
         </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {recentCollections.map((collection) => (
-            <CollectionCard key={collection.id} collection={collection} />
-          ))}
-        </div>
+        {collections.length > 0 ? (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {collections.map((collection) => (
+              <CollectionCard key={collection.id} collection={collection} />
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-lg border border-dashed p-8 text-center">
+            <p className="text-sm text-muted-foreground">
+              No collections yet. Group related items into a collection to keep
+              them together.
+            </p>
+          </div>
+        )}
       </section>
 
       <section className="space-y-4">
