@@ -14,8 +14,7 @@ Spec: @context/features/dashboard-collections-spec.md
 
 ## Status
 
-Complete — built and verified. Still on `feature/dashboard-collections`; not yet
-committed or merged.
+Complete — merged to `main` as `e798cac` and pushed
 
 ## Goals
 
@@ -193,4 +192,5 @@ committed or merged.
 - **Not verified by me:** no browser automation this session, so hover states, responsive breakpoints, and the match against `context/screenshots/dashboard-ui-main.png` went unchecked
 - **Known inconsistency, deliberately left:** the sidebar's Favorites and Recent lists still render the six mock collections next to five real cards. The spec scoped this to the main area; the sidebar is its own follow-up
 - Left in place: `mock-data.ts` keeps every export in use — `mockItems` and `mockItemTypesById` for Pinned/Recent and `ItemRow`, `mockItemTypes` for the item stats, `mockCollections` for the sidebar
+- Merged to `main` as `e798cac` (feature commit `2cc7c84`) and pushed
 - Carried forward: the prod Neon branch still has no migrations applied and no seed
