@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ChevronDown, Folder, Folders, Layers, Settings, Star } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import {
   Collapsible,
   CollapsibleContent,
@@ -35,6 +36,7 @@ import {
   getItemTypeDotClass,
   getItemTypeIcon,
   getItemTypePluralLabel,
+  isProItemType,
 } from "@/lib/item-types";
 import { cn } from "@/lib/utils";
 
@@ -66,6 +68,27 @@ function EmptyGroupNote({ children }: { children: React.ReactNode }) {
     <p className="px-2 py-1 text-xs text-sidebar-foreground/50 group-data-[collapsible=icon]:hidden">
       {children}
     </p>
+  );
+}
+
+/**
+ * Marks a Pro-gated type. Sized down from the card-scale default, and dimmed
+ * with `opacity` rather than a fixed text color so it inherits the badge slot's
+ * color — including the brightening the slot does on row hover, which a color of
+ * its own would opt out of. `role="img"` is what makes the label reach a screen
+ * reader: `aria-label` alone on a roleless element is ignored, and "PRO" would
+ * otherwise be announced as a bare token mid-list.
+ */
+function ProBadge() {
+  return (
+    <Badge
+      variant="outline"
+      role="img"
+      aria-label="Pro feature"
+      className="h-4 border-sidebar-border px-1.5 text-[0.625rem] font-semibold tracking-wide text-inherit opacity-60"
+    >
+      PRO
+    </Badge>
   );
 }
 
@@ -158,7 +181,13 @@ export async function AppSidebar() {
                             <span>{label}</span>
                           </Link>
                         </SidebarMenuButton>
-                        <SidebarMenuBadge>{type.count}</SidebarMenuBadge>
+                        <SidebarMenuBadge>
+                          {isProItemType(type.slug) ? (
+                            <ProBadge />
+                          ) : (
+                            type.count
+                          )}
+                        </SidebarMenuBadge>
                       </SidebarMenuItem>
                     );
                   })}

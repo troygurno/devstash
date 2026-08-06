@@ -1,111 +1,91 @@
-# Current Feature
+# Current Feature: Add Pro Badge to Sidebar
 
-**Stats & sidebar — the last of the mock data**
+**A PRO badge on the Files and Images rows in the sidebar**
 
-Move @src/components/layout/AppSidebar.tsx off @src/lib/mock-data.ts and onto
-Postgres. The Types list gets the seven real `ItemType` rows with real per-type item
-counts; the Collections section gets real favorites and real recents, a
-"View all collections" link, and — on the Recent rows only — a colored dot for the
-collection's most-used item type in place of the count badge. Favorites keep the
-amber star.
+The two Pro-gated system types are marked nowhere in the UI. Add a small uppercase
+**PRO** badge to the Files and Images rows in the Types list of
+@src/components/layout/AppSidebar.tsx, built on the shadcn `Badge` component and
+styled to stay subtle — a marker, not a call to action.
 
-The layout stays exactly as it is. This closes the two inconsistencies carried since
-the collections round: the sidebar's per-type counts summing to **85** against a real
-**18** on the stat card, and six mock collections rendering beside five real ones.
+Nothing else about the sidebar changes: same rows, same order, same hrefs, same
+counts everywhere else.
 
-Spec: @context/features/stats-sidebar-spec.md
+Spec: @context/features/add-pro-badge-sidebar.md
 
 ## Status
 
-Complete — merged to `main` as `4398273` and pushed
+In Progress — branch `feature/add-pro-badge-sidebar`
 
 ## Goals
 
-- [x] `getItemTypeCounts(userId)` in @src/lib/db/items.ts — all seven types with a
-      real item count each, including the types holding zero
-- [x] `getSidebarCollections(userId)` in @src/lib/db/collections.ts — favorites and
-      recents, each recent carrying its dominant type for the dot
-- [x] `AppSidebar` becomes an async server component fetching its own data; the
-      module-scope `favoriteCollections` / `recentCollections` constants go away
-- [x] Types render from real rows: icon, name, `/items/[slug]` href, real count
-- [x] Collections render real rows — Favorites with the star badge, Recent with a
-      dominant-type dot
-- [x] "View all collections" link under the collections list → `/collections`
-- [x] `getItemTypeDotClass` in @src/lib/item-types.ts — a solid dot color, not the
-      `/10` tint `getItemTypeBgClass` returns
-- [x] Filter `deletedAt: null` everywhere; keep `RECENT_COLLECTION_COUNT` at 5
-- [x] Empty states: no favorites and no collections at all both render sensibly
-- [x] Delete @src/lib/mock-data.ts once nothing imports it
-- [x] Verify: `npm run lint`, `npm run build`, `npx tsc --noEmit` clean, and the
-      served HTML checked entry by entry
+- [x] A `PRO` badge renders on the Files and Images rows in the sidebar's Types list,
+      and on no other row
+- [x] Built on the shadcn `Badge` component at @src/components/ui/badge.tsx — already
+      installed since dashboard phase 3, so no `shadcn add`
+- [x] Label is uppercase `PRO`, subtle enough to read as a marker rather than an
+      advertisement
+- [x] Which types are Pro comes from one exported lookup in @src/lib/item-types.ts,
+      keyed by slug like the five maps already there — not hardcoded in the component
+- [x] The badge sits sensibly against the existing count badge (see Open Question 1)
+- [x] Collapsed icon mode still renders cleanly — structurally confirmed, not seen
+- [x] Verify: `npm run lint`, `npm run build`, `npx tsc --noEmit` clean, plus the
+      served HTML checked row by row
 
 ## Open Questions
 
-| #   | Question                                                        | Resolution                                                                                                                                                                                                                                                                    |
-| --- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1   | The spec's first requirement — main-area stats from the database | **Already shipped.** `StatsCards` came off `mock-data.ts` entirely last round; all four figures are real counts. The only stat surface left on mock data is the sidebar's per-type badges, so that's what "stats" means here.                                                     |
-| 2   | The spec says "create `src/lib/db/items.ts`"                     | **It exists** — `getPinnedItems`, `getRecentItems`, `getItemStats`. This round **adds to** it rather than creating it.                                                                                                                                                          |
-| 3   | `/items/[typename]` or `/items/[typeSlug]`?                      | **Slug**, which is what the sidebar already links and what the route table in @context/project-overview.md §7 specifies. The page itself still doesn't exist; the href stays correct-but-dead, same as now.                                                                       |
-| 4   | Per-type counts — raw SQL, or Prisma?                            | **Prisma `groupBy`.** `itemTypeId` is a column on `Item`, so the count is one hop, not the two that forced `$queryRaw` in `collections.ts`. Types with zero items don't come back from a group-by, so all seven come from `itemType.findMany` and the counts merge in JS.        |
-| 5   | Does the sidebar fetch, or take props from the layout?           | **Fetches itself**, as an async server component. It renders from @src/app/dashboard/layout.tsx, not from the page, and threading props through the layout buys nothing. Cost: its collection query is separate from the page's — different shape and limit, so no sharing anyway. |
-| 6   | Dominant type on a Recent row — reuse `getRecentCollections`?    | **Reuse the derivation, not the function.** The sidebar needs name + dominant type for 5 rows and nothing else; `DashboardCollection` also carries `description`, `itemCount`, and the full `types` array for the cards. A separate leaner query in the same file.                |
-| 7   | Do Recent rows lose their count badge?                           | **Yes** — the spec puts the dot there and the badge slot holds one thing. Favorites keep the star, Recent gets the dot, neither shows a number. Flagging it because it's a small loss of information the current sidebar has.                                                     |
-| 8   | Dot color for a collection with no items?                        | **Neutral** — `bg-muted-foreground/40`, matching how `CollectionCard` falls back when `dominantType` is null. The seed has no empty collections, so this is code-read only again.                                                                                                |
-| 9   | Does the footer user come off `mockUser` too?                    | **Yes** — `getCurrentUser()` sits beside `getCurrentUserId` in @src/lib/db/user.ts and the footer reads **Demo User / demo@devstash.io** instead of John Doe. Outside the spec's bullets, but `mock-data.ts` couldn't be deleted while the footer imported it. Built on the recommendation without an explicit answer — **flagging it as the one call made unilaterally.** |
-| 10  | `ItemType.name` is singular, the sidebar labels were plural       | **A slug → plural label map** in `item-types.ts`, alongside the four maps already keyed the same way. The seed stores "Snippet"; a nav row standing for a category reads "Snippets", which is what the sidebar showed on mock data. Falls back to the stored name for a slug it doesn't know, so a custom type renders as named. |
-| 11  | Favorites order in the sidebar?                                   | **Alphabetical.** A hand-curated list shouldn't reorder itself whenever an item is added — that's what the Recent list below it is for.                                                                                                                                                        |
+| #   | Question                                                | Recommendation                                                                                                                                                                                                                                                                                                                                       |
+| --- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Does PRO replace the count, or sit beside it?           | **Replace it — chosen by Troy at `start`.** `SidebarMenuBadge` is one absolutely-positioned slot on the right of the row, and the stats/sidebar round already set the precedent that it holds one thing (Recent traded its count for the dot). Files and Images both read `0` today, so nothing is lost now — but it does mean a Pro user's file count won't show in the sidebar. Alternative: both, inside the one slot, which is tight at the sidebar's width. |
+| 2   | Where does "which types are Pro" come from?             | **A `PRO_ITEM_TYPE_SLUGS` set in `item-types.ts`**, beside the five existing slug-keyed maps, with an `isProItemType(slug)` reader. `ItemType` has no `isPro` column and adding one is a migration this spec doesn't ask for. @context/project-overview.md §4 already names files and images as the Pro pair.                                             |
+| 3   | Which `Badge` variant reads as "clean and subtle"?      | **`outline`** — a hairline border and foreground text, no fill competing with the type icon's color. `secondary` is the fallback if outline disappears against the sidebar background. Needs a size override either way: the badge's default `h-5`/`text-xs` is sized for cards, not a 20px sidebar badge slot.                                            |
+| 4   | Does the badge show in collapsed icon mode?             | **No, and that needs no work** — `SidebarMenuBadge` carries `group-data-[collapsible=icon]:hidden`, so PRO disappears with the counts. Worth confirming visually rather than assuming.                                                                                                                                                                  |
+| 5   | Does anything gate on this, or is it display only?      | **Display only.** `limits.ts` and the server-side gates are Phase 4 work; this is a label. The rows stay clickable and their hrefs unchanged.                                                                                                                                                                                                          |
+| 6   | The `◆ = Pro` marker in @context/project-overview.md §11 | The layout sketch there marks Pro types with a diamond. **The spec's badge wins** — it's the newer instruction and shadcn `Badge` is named explicitly. Flagging the doc drift rather than editing the overview.                                                                                                                                          |
 
 ## Notes
 
-- **The two carried inconsistencies are closed.** The sidebar's per-type counts now
-  total **18**, matching the Items stat card exactly, and the five collections in the
-  sidebar are the same five the main area renders.
-- `rankTypesByCollection` and `pickDominantType` were extracted out of
-  `getRecentCollections` so the sidebar shares the derivation rather than duplicating
-  the raw SQL. `getRecentCollections`'s behavior is unchanged — same ordering, same
-  `defaultTypeId` tiebreak, same neutral fallback — it just reads the ranked rows from
-  the helper now.
-- Per-type counts are a **Prisma `groupBy`**, no raw SQL. `itemTypeId` is a column on
-  `Item`, so it's one hop; the `$queryRaw` in `collections.ts` exists only because
-  that count is keyed on `(collectionId, itemTypeId)` two hops out.
-- `getItemTypeCounts` scopes to `userId: null OR userId` — system types plus the
-  user's own. Custom types are a later Pro feature, so today that's always the seven
-  seeded rows, but the query is already right when they land.
-- The seed's shape is now honest on screen: **Notes, Files, and Images read a real 0**
-  where mock data invented 12 / 5 / 3. This is also the first live outing for the
-  yellow Note color — on a badge, which is the use @context/project-overview.md §4
-  says the color is safe for.
-- The dot needed its own map. `getItemTypeBgClass` returns `bg-*/10`, a tile tint that
-  disappears at 8px; `getItemTypeDotClass` returns the solid `bg-blue-500` form and
-  falls back to `bg-muted-foreground/40` when a collection has no dominant type.
-- Sidebar rendering from the layout means it queries on every dashboard route, not
-  just `/dashboard`. Fine today — one route exists. Worth remembering when `/items`
-  and `/collections` land.
-- Seven queries per dashboard load now: the sidebar's three (user, type counts +
-  types, collections + the grouped count) plus the page's five, all overlapping inside
-  two `Promise.all`s. The sidebar's collection query is deliberately separate from the
-  page's — different shape, different limit.
-- Verified against the running dev server, entry by entry. **Types:** Snippets 4,
-  Prompts 3, Commands 5, Notes 0, Links 6, Files 0, Images 0 — 18 total, and all seven
-  hrefs resolve to `/items/<slug>`. **Favorites:** AI Workflows, React Patterns,
-  Terminal Commands, alphabetical, each with the amber star. **Recent:** Design
-  Resources, Terminal Commands, DevOps, AI Workflows, React Patterns in `updatedAt`
-  desc, with dots emerald / orange / emerald / violet / blue — matching the dominant
-  types the collection cards resolved last round. **Footer:** `DU`, Demo User,
-  demo@devstash.io. Stat cards unchanged at 18 / 5 / 6 / 3.
-- **Not verified:** the three empty states (no favorites, no collections, no user) are
-  code-read only — exercising them needs an empty database. No browser automation this
-  session either, so the dot's size against the star, collapse-to-icon behavior for the
-  new "View all collections" row, and hover states went unchecked, same as every round
-  since phase 2.
-- Recent rows traded their count badge for the dot, since the badge slot holds one
-  thing. Favorites show a star and no number, Recent shows a dot and no number — the
-  sidebar no longer states a collection's size anywhere. The cards in the main area
-  still do.
-- Carried in and unchanged: the row date on the dashboard reads the same "Aug 3" on
-  every item because `prisma/seed.ts` never sets `Item.createdAt`. Not in this spec's
-  scope; still an open follow-up.
-- The prod Neon branch still has **no migrations applied** and no seed.
+- Scope is deliberately small: one component, one lookup, no query changes and no
+  schema changes. The sidebar's three queries stay as they are.
+- The Files and Images rows currently render `0` in the badge slot, since the seed has
+  no items of either type. Whatever Open Question 1 resolves to is therefore
+  unobservable against real data today — it only matters once a Pro user has files.
+- `AppSidebar` is an async server component and `Badge` is not a client component, so
+  nothing here forces a `'use client'` boundary.
+- Carried in and unchanged from earlier rounds: the flat "Aug 3" item date from the
+  unseeded `Item.createdAt`, and the prod Neon branch with no migrations applied and
+  no seed.
+
+### Implementation
+
+- Two files touched. `PRO_ITEM_TYPE_SLUGS` (a `Set`) and `isProItemType(slug)` went
+  into @src/lib/item-types.ts beside the five existing slug-keyed maps; `AppSidebar`
+  gained a module-scope `ProBadge` component and one ternary in the badge slot.
+- The badge needs size overrides, not just a variant. shadcn's `Badge` is sized for
+  cards — `h-5 px-2 text-xs` — against a 20px sidebar badge slot. `ProBadge` passes
+  `h-4 px-1.5 text-[0.625rem] font-semibold tracking-wide` plus
+  `border-sidebar-border`, so it sits in the sidebar's palette rather than the card
+  one. Confirmed in the served HTML that `tailwind-merge` dropped `h-5`,
+  `border-border`, and `text-foreground` in favor of the overrides — worth checking
+  rather than assuming, since a failed merge would leave both classes and let source
+  order decide.
+- **Dimmed with `opacity-60` and `text-inherit`, not a fixed text color.** The badge
+  slot brightens on row hover via `peer-hover/menu-button:text-sidebar-accent-foreground`.
+  A color of its own would have opted PRO out of that, leaving it static while every
+  count around it responded — and the peer variant can't be reapplied to the badge
+  directly, since `ProBadge` is a descendant of the slot, not a sibling of the button.
+  Inheriting and dimming keeps it on the same hover behavior as the counts.
+- **`role="img"` alongside `aria-label="Pro feature"`.** `aria-label` on a roleless
+  `<span>` is prohibited by ARIA in HTML and ignored in practice, so the first cut had
+  a dead attribute and screen readers would still have read the bare token "PRO". The
+  role is what exposes the label — the same pairing `DominantTypeDot` already uses
+  ten lines below. Caught at `review`.
+- Contrast checked rather than eyeballed: the dimmed label reads **6.79:1** against
+  the sidebar in dark mode and **5.18:1** in light, both clear of WCAG AA at any size.
+  Worth computing given @context/project-overview.md §4 already documents one type
+  color that fails the same test.
+- No `'use client'` anywhere — `Badge` is a plain span, so `AppSidebar` stays an async
+  server component. No query, schema, or route changes; the sidebar's three queries
+  are untouched.
 
 ## History
 
