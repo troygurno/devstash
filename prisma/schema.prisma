@@ -126,6 +126,20 @@ model Item {
   @@index([userId, deletedAt, lastUsedAt(sort: Desc)])
   @@index([userId, deletedAt, itemTypeId])
   @@index([userId, deletedAt, isPinned, isFavorite])
+  // Covers the Pinned and Recent list queries' FILTER. Prisma cannot express
+  // NULLS LAST, so the migration that creates this index is hand-edited to add it —
+  // the column is `lastUsedAt DESC NULLS LAST` in the database, which is what
+  // getRecentItems/getPinnedItems actually order by. Do not "fix" the difference by
+  // regenerating this index.
+  //
+  // KNOWN LIMITATION — this index does NOT eliminate the sort. Postgres treats
+  // `deletedAt IS NULL` as a NullTest rather than an equality and will not derive
+  // sort order from key columns positioned after it, so EXPLAIN still shows a Sort
+  // node above the Index Scan. The fix is a PARTIAL index keyed
+  // (userId, isPinned, lastUsedAt DESC NULLS LAST, createdAt DESC)
+  // WHERE deletedAt IS NULL, which was verified to remove the Sort but deferred
+  // because landing it cleanly needs a migrate reset. See current-feature.md.
+  @@index([userId, deletedAt, isPinned, lastUsedAt(sort: Desc), createdAt(sort: Desc)])
 }
 
 // ─────────────────────────────────────────────
@@ -154,7 +168,11 @@ model Collection {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  @@unique([userId, name])
+  // Name uniqueness is enforced by a PARTIAL unique index — see
+  // migrations/20260806_collection_name_unique_live. A plain @@unique([userId, name])
+  // counts soft-deleted rows, so deleting "React Patterns" and recreating it would
+  // hit P2002 on a row the user cannot see. Prisma cannot express a WHERE clause on
+  // an index, so the constraint lives only in SQL.
   @@index([userId, deletedAt, updatedAt(sort: Desc)])
 }
 
