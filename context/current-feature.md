@@ -1,91 +1,22 @@
-# Current Feature: Add Pro Badge to Sidebar
+# Current Feature
 
-**A PRO badge on the Files and Images rows in the sidebar**
-
-The two Pro-gated system types are marked nowhere in the UI. Add a small uppercase
-**PRO** badge to the Files and Images rows in the Types list of
-@src/components/layout/AppSidebar.tsx, built on the shadcn `Badge` component and
-styled to stay subtle — a marker, not a call to action.
-
-Nothing else about the sidebar changes: same rows, same order, same hrefs, same
-counts everywhere else.
-
-Spec: @context/features/add-pro-badge-sidebar.md
+<!-- Load a spec with /feature load [name] -->
 
 ## Status
 
-In Progress — branch `feature/add-pro-badge-sidebar`
+Not Started
 
 ## Goals
 
-- [x] A `PRO` badge renders on the Files and Images rows in the sidebar's Types list,
-      and on no other row
-- [x] Built on the shadcn `Badge` component at @src/components/ui/badge.tsx — already
-      installed since dashboard phase 3, so no `shadcn add`
-- [x] Label is uppercase `PRO`, subtle enough to read as a marker rather than an
-      advertisement
-- [x] Which types are Pro comes from one exported lookup in @src/lib/item-types.ts,
-      keyed by slug like the five maps already there — not hardcoded in the component
-- [x] The badge sits sensibly against the existing count badge (see Open Question 1)
-- [x] Collapsed icon mode still renders cleanly — structurally confirmed, not seen
-- [x] Verify: `npm run lint`, `npm run build`, `npx tsc --noEmit` clean, plus the
-      served HTML checked row by row
-
-## Open Questions
-
-| #   | Question                                                | Recommendation                                                                                                                                                                                                                                                                                                                                       |
-| --- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Does PRO replace the count, or sit beside it?           | **Replace it — chosen by Troy at `start`.** `SidebarMenuBadge` is one absolutely-positioned slot on the right of the row, and the stats/sidebar round already set the precedent that it holds one thing (Recent traded its count for the dot). Files and Images both read `0` today, so nothing is lost now — but it does mean a Pro user's file count won't show in the sidebar. Alternative: both, inside the one slot, which is tight at the sidebar's width. |
-| 2   | Where does "which types are Pro" come from?             | **A `PRO_ITEM_TYPE_SLUGS` set in `item-types.ts`**, beside the five existing slug-keyed maps, with an `isProItemType(slug)` reader. `ItemType` has no `isPro` column and adding one is a migration this spec doesn't ask for. @context/project-overview.md §4 already names files and images as the Pro pair.                                             |
-| 3   | Which `Badge` variant reads as "clean and subtle"?      | **`outline`** — a hairline border and foreground text, no fill competing with the type icon's color. `secondary` is the fallback if outline disappears against the sidebar background. Needs a size override either way: the badge's default `h-5`/`text-xs` is sized for cards, not a 20px sidebar badge slot.                                            |
-| 4   | Does the badge show in collapsed icon mode?             | **No, and that needs no work** — `SidebarMenuBadge` carries `group-data-[collapsible=icon]:hidden`, so PRO disappears with the counts. Worth confirming visually rather than assuming.                                                                                                                                                                  |
-| 5   | Does anything gate on this, or is it display only?      | **Display only.** `limits.ts` and the server-side gates are Phase 4 work; this is a label. The rows stay clickable and their hrefs unchanged.                                                                                                                                                                                                          |
-| 6   | The `◆ = Pro` marker in @context/project-overview.md §11 | The layout sketch there marks Pro types with a diamond. **The spec's badge wins** — it's the newer instruction and shadcn `Badge` is named explicitly. Flagging the doc drift rather than editing the overview.                                                                                                                                          |
+<!-- Populated by /feature load -->
 
 ## Notes
 
-- Scope is deliberately small: one component, one lookup, no query changes and no
-  schema changes. The sidebar's three queries stay as they are.
-- The Files and Images rows currently render `0` in the badge slot, since the seed has
-  no items of either type. Whatever Open Question 1 resolves to is therefore
-  unobservable against real data today — it only matters once a Pro user has files.
-- `AppSidebar` is an async server component and `Badge` is not a client component, so
-  nothing here forces a `'use client'` boundary.
-- Carried in and unchanged from earlier rounds: the flat "Aug 3" item date from the
-  unseeded `Item.createdAt`, and the prod Neon branch with no migrations applied and
-  no seed.
+<!-- Populated by /feature load -->
 
-### Implementation
+## Open Questions
 
-- Two files touched. `PRO_ITEM_TYPE_SLUGS` (a `Set`) and `isProItemType(slug)` went
-  into @src/lib/item-types.ts beside the five existing slug-keyed maps; `AppSidebar`
-  gained a module-scope `ProBadge` component and one ternary in the badge slot.
-- The badge needs size overrides, not just a variant. shadcn's `Badge` is sized for
-  cards — `h-5 px-2 text-xs` — against a 20px sidebar badge slot. `ProBadge` passes
-  `h-4 px-1.5 text-[0.625rem] font-semibold tracking-wide` plus
-  `border-sidebar-border`, so it sits in the sidebar's palette rather than the card
-  one. Confirmed in the served HTML that `tailwind-merge` dropped `h-5`,
-  `border-border`, and `text-foreground` in favor of the overrides — worth checking
-  rather than assuming, since a failed merge would leave both classes and let source
-  order decide.
-- **Dimmed with `opacity-60` and `text-inherit`, not a fixed text color.** The badge
-  slot brightens on row hover via `peer-hover/menu-button:text-sidebar-accent-foreground`.
-  A color of its own would have opted PRO out of that, leaving it static while every
-  count around it responded — and the peer variant can't be reapplied to the badge
-  directly, since `ProBadge` is a descendant of the slot, not a sibling of the button.
-  Inheriting and dimming keeps it on the same hover behavior as the counts.
-- **`role="img"` alongside `aria-label="Pro feature"`.** `aria-label` on a roleless
-  `<span>` is prohibited by ARIA in HTML and ignored in practice, so the first cut had
-  a dead attribute and screen readers would still have read the bare token "PRO". The
-  role is what exposes the label — the same pairing `DominantTypeDot` already uses
-  ten lines below. Caught at `review`.
-- Contrast checked rather than eyeballed: the dimmed label reads **6.79:1** against
-  the sidebar in dark mode and **5.18:1** in light, both clear of WCAG AA at any size.
-  Worth computing given @context/project-overview.md §4 already documents one type
-  color that fails the same test.
-- No `'use client'` anywhere — `Badge` is a plain span, so `AppSidebar` stays an async
-  server component. No query, schema, or route changes; the sidebar's three queries
-  are untouched.
+<!-- Populated by /feature load -->
 
 ## History
 
@@ -297,5 +228,66 @@ In Progress — branch `feature/add-pro-badge-sidebar`
   session, so the dot's weight against the star, collapse-to-icon on the new "View all
   collections" row, and hover states went unchecked, same as every round since phase 2
 - Merged to `main` as `4398273` (feature commit `56d214c`) and pushed; branch deleted
+- Carried forward: the flat "Aug 3" item date from the unseeded `Item.createdAt`, and
+  the prod Neon branch with no migrations applied and no seed
+
+### 2026-08-06 — PRO badge on the sidebar's Pro-gated types
+
+- Branch `feature/add-pro-badge-sidebar`
+- Smallest round yet: two source files, +33/−1, no query, schema, route, or
+  dependency changes. `shadcn/ui` `Badge` has been installed since dashboard phase 3,
+  so no `shadcn add` either
+- `PRO_ITEM_TYPE_SLUGS` and `isProItemType(slug)` added to `src/lib/item-types.ts`,
+  beside the five maps already keyed by slug. **`ItemType` has no `isPro` column** and
+  this didn't warrant a migration — a type's tier is presentation until the Phase 4
+  gates in `limits.ts` land, and those enforce server-side regardless of what the
+  sidebar renders. `project-overview.md` §4 is the source naming files and images as
+  the Pro pair
+- **PRO replaces the count** on those two rows rather than sitting beside it — Troy's
+  call at `start`. `SidebarMenuBadge` is one absolutely-positioned slot, so it holds
+  one thing, the same reasoning that had Recent collections trade their count for a
+  dominant-type dot last round. Both rows read 0 today so nothing is lost yet; it
+  means a Pro user's file count won't appear in the sidebar
+- The badge needed **size overrides, not just a variant**. shadcn's `Badge` is sized
+  for cards (`h-5 px-2 text-xs`) against a 20px sidebar slot; `ProBadge` passes
+  `h-4 px-1.5 text-[0.625rem] font-semibold tracking-wide` plus `border-sidebar-border`
+  so it sits in the sidebar's palette. Verified in the served HTML that
+  `tailwind-merge` actually dropped `h-5`, `border-border`, and `text-foreground` — a
+  failed merge would have left both classes and let source order decide
+- **Two defects found at `review` and fixed before commit:**
+  1. `aria-label` was on a roleless `<span>`, where ARIA in HTML prohibits it and
+     screen readers ignore it. The attribute did nothing and PRO would still have been
+     announced as a bare token. Added `role="img"` — the same pairing `DominantTypeDot`
+     already uses ten lines below in the same file, a precedent sitting in plain sight
+  2. A fixed `text-sidebar-foreground/60` opted the badge out of the slot's
+     `peer-hover/menu-button:` brightening, so PRO would have sat static while every
+     count around it lit up on row hover. The peer variant can't be reapplied to the
+     badge directly — `ProBadge` is a descendant of the slot, not a sibling of the
+     button — so it switched to `text-inherit opacity-60`, which inherits the color and
+     its hover shift while staying dim
+- Contrast computed rather than eyeballed: **6.79:1** dark, **5.18:1** light, both
+  clear of WCAG AA at any size. Worth the arithmetic given §4 already documents one
+  type color that fails the same test
+- Also checked rather than assumed: `--color-sidebar-border` and the sidebar color
+  tokens genuinely exist in `globals.css`, since a missing token fails silently as no
+  border at all. No prettier is configured in this repo, so formatting is lint's
+  business only
+- Verified: `npm run lint`, `npm run build`, `npx tsc --noEmit` clean before and after
+  the review fixes. Served HTML checked row by row — Files and Images carry `PRO` with
+  `role="img"`, the label, and the new classes; Snippets 4 / Prompts 3 / Commands 5 /
+  Notes 0 / Links 6 unchanged and still totalling 18; collections, "View all
+  collections", footer, and the 18 / 5 / 6 / 3 stat cards all untouched
+- **Not verified:** no browser automation, so the badge's visual weight beside the
+  counts and the hover brightening wired up at `review` went unseen. Collapse-to-icon
+  is structural only — `SidebarMenuBadge` carries `group-data-[collapsible=icon]:hidden`
+  and the class is present on the Files slot, so PRO hides with the counts, but it
+  wasn't watched. Same gap as every round since phase 2
+- **Doc drift, flagged not fixed:** the layout sketch in `project-overview.md` §11
+  marks Pro types with a `◆` diamond. The spec's badge won as the newer and more
+  specific instruction, but §11 now describes something the sidebar doesn't do
+- Merged to `main` as `e4f3b40` (feature commit `1df1134`); branch deleted
+- Left untracked deliberately: `.claude/` (the `feature` and `list-components` skill
+  definitions). They predate this feature and whether tooling config belongs in the
+  repo is a separate call, not something to fold into a `feat:` commit
 - Carried forward: the flat "Aug 3" item date from the unseeded `Item.createdAt`, and
   the prod Neon branch with no migrations applied and no seed
