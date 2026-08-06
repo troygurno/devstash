@@ -1,172 +1,22 @@
-# Current Feature: Audit fixes (quick wins + index migrations)
+# Current Feature
 
 <!-- Load a spec with /feature load [name] -->
 
 ## Status
 
-In Progress — branch `feature/audit-fixes`. All eight goals implemented and
-verified; **not committed** (waiting on the commit-type question below).
-
-> **Scope grew at `start`.** The spec originally excluded the two `medium` findings
-> because they need migrations. Troy's call: include them, done as proper migrations,
-> so the dev and prod Neon branches can be brought into sync — prod currently has no
-> migrations applied at all. They are goals 7 and 8 below.
+Not Started
 
 ## Goals
 
-Eight fixes from the `code-scanner` audit on 2026-08-06: the six `trivial`/`low`
-quick wins, plus the two `medium` index findings added at `start`. No new dependency
-and no behavior change a user can see. Goals 1–6 are independently applicable; 7 and
-8 each need a migration.
-
-Ordered by value, as the audit ranked them:
-
-- [x] **Scope the type lookup to the user** — `src/lib/db/collections.ts:206`.
-      `rankTypesByCollection` already takes `userId` and uses it to scope the raw
-      count on line 202, but the sibling `prisma.itemType.findMany()` has no `where`
-      at all and selects every row in `ItemType`. Mirror the scoping
-      `getItemTypeCounts` already uses: `where: { OR: [{ userId: null }, { userId }] }`.
-      The existing `.filter()` on line 225 already tolerates a narrower map, so
-      nothing else changes.
-- [x] **Kill the duplicate `User` query** — `src/lib/db/user.ts:24`. `AppSidebar`
-      calls `getCurrentUser` from the layout and `DashboardPage` calls
-      `getCurrentUserId` from the page; both issue the same
-      `SELECT … WHERE email = 'demo@devstash.io'` on every request. Prisma has no
-      request-level dedupe — only `fetch` gets that in Next 16. Wrap the resolver in
-      React's `cache` and derive `getCurrentUserId` from it.
-- [x] **Fail loudly on a missing `DATABASE_URL`** — `src/lib/prisma.ts:8`.
-      `PoolConfig.connectionString` is optional, so an unset variable typechecks,
-      constructs a pool with `undefined`, and surfaces as an opaque Neon error on the
-      first query. `scripts/test-db.ts:136` already guards this; the app path does
-      not. Throw at module load naming the variable and pointing at `.env.example`.
-- [x] **Cap the sidebar's favorites query** — `src/lib/db/collections.ts:128`. The
-      Recent query below it takes `recentLimit`; the favorites query above has
-      `orderBy` and no `take`. Add a `favoriteLimit` parameter and a `take`, letting
-      the existing "View all collections" row absorb the overflow.
-- [x] **Split `AppSidebar`** — `src/components/layout/AppSidebar.tsx:139`. The
-      exported function spans 139–302 (164 lines) against the "under 50 lines" rule in
-      `coding-standards.md`, and the file also holds five presentational helpers plus
-      `getInitials` plus its own data fetching. Keep `AppSidebar.tsx` as the async
-      data-fetching shell and move out `sidebar/TypesGroup.tsx` (Types collapsible +
-      `ProBadge`), `sidebar/CollectionsGroup.tsx` (Collections collapsible +
-      `SubGroupLabel`, `EmptyGroupNote`, `CollectionMenuItem`, `DominantTypeDot`), and
-      `sidebar/SidebarUser.tsx` (footer + `getInitials`). All three are pure
-      presentational server components; the queries are untouched.
-- [x] **Break up `main()` in the smoke test** — `scripts/test-db.ts:135`. `main` runs
-      135–335 across five unrelated concerns. Extract `checkSeedData()`,
-      `checkDemoWorkingSet()`, `checkConstraints()`, `checkCrudRoundTrip()`, leaving
-      `main` as the connection probe plus four calls. `failures` is already module
-      state, so `check` keeps working unchanged. No behavior change.
-- [x] ⚠️ **Index the item list sort** — migration. **Shipped, but does not fully
-      achieve its aim — see "Goal 7 is partial" in Notes.** Both list queries order by
-      `[lastUsedAt desc nulls last, createdAt desc]`, and no index serves it:
-      `Item_userId_deletedAt_lastUsedAt_idx`
-      (`20260803185015_init/migration.sql:165`) omits `createdAt` entirely, and a
-      Postgres `DESC` index column is `NULLS FIRST`, which does not match the emitted
-      `DESC NULLS LAST`. Add
-      `("userId", "deletedAt", "isPinned", "lastUsedAt" DESC NULLS LAST, "createdAt" DESC)`
-      so both `getPinnedItems` and `getRecentItems` are covered filter-and-sort.
-      Prisma cannot express `NULLS LAST` in `@@index`, so the generated SQL is edited
-      by hand — the precedent is `20260803185100_system_type_slug_unique`.
-- [x] **Make `Collection`'s name uniqueness ignore soft-deleted rows** — migration.
-      `@@unique([userId, name])` (`schema.prisma:157`) counts rows with `deletedAt`
-      set, so once collection CRUD ships, deleting "React Patterns" and recreating it
-      hits `P2002` on a row the user cannot see. Drop the constraint and replace it
-      with a partial unique index `WHERE "deletedAt" IS NULL`.
-
-Done when all eight are applied, `npm run db:status` is in sync, `npm run db:test`
-passes, `npm run lint` / `npm run build` / `npx tsc --noEmit` are clean, and the
-served `/dashboard` HTML is **unchanged in the ways that matter** — stat cards still
-18 / 5 / 6 / 3, Types still 4 / 3 / 5 / 0 / 6 / 0 / 0 with PRO on Files and Images,
-the same five collections in the same order with the same dominant-type dots, and
-Pinned/Recent unchanged.
+<!-- Populated by /feature load -->
 
 ## Notes
 
-- **Provenance.** These are the `Quick wins` list from the `code-scanner` subagent's
-  first real run. The audit found 0 critical, 0 high, 4 medium, 4 low across 21
-  in-scope files. Every `file:line` above was independently re-checked against the
-  working tree before this spec was written — all eight the audit cited were exact.
-- **This is a refactor round, not a feature.** Nothing here is user-visible. The
-  guard rail is that the rendered dashboard must not change; if it does, something
-  was misapplied.
-- **Both index findings are latent, not live.** Nothing is broken today — the free
-  cap is 50 items so the missing sort index costs nothing, and no collection delete
-  path exists yet so the `P2002` cannot fire. They are in this round because
-  retrofitting either after real data exists is the expensive version, which is the
-  same argument `project-overview.md` §5 makes for settling schema before data.
-- **Migration mechanics, checked before starting:**
-  - `npm run db:migrate` (`prisma migrate dev`) only — never `db push`, per
-    `CLAUDE.md`. `npm run db:generate` afterwards, since Prisma 7 no longer generates
-    on migrate.
-  - Both indexes need SQL Prisma cannot express, so each is `migrate dev
-    --create-only`, hand-edit, then apply.
-  - **Drift risk to watch:** `itemtype_system_slug_key` already exists in the
-    database via hand-written SQL but is absent from `schema.prisma`. If Prisma's
-    shadow-database diff decides to drop it, the generated SQL must be corrected
-    before applying. Check every generated migration for an unexpected `DROP INDEX`.
-  - Removing `@@unique([userId, name])` from `Collection` is safe for the seed —
-    `seedCollections` upserts on `id` (`prisma/seed.ts:473`), not on `userId_name`.
-    The `userId_name` compound key used at `seed.ts:461` and `:493` is **Tag's**, and
-    Tag is untouched.
-- **Goal 7 is partial — found at `review`, deliberately left.** The index is created
-  and the planner does choose it, but **only for the filter**. A `Sort` node still
-  sits above the Index Scan, which is the exact cost goal 7 set out to remove.
-  - Cause: Postgres treats `deletedAt IS NULL` as a **NullTest, not an equality**, so
-    it will not derive sort order from key columns positioned after `deletedAt`.
-    Isolated by changing that one predicate and nothing else — with
-    `deletedAt = now()` the Sort node disappears; with `IS NULL` it stays.
-  - Verified fix, tested by creating and dropping the candidate inside a single
-    transaction so the database was left untouched:
-    ```sql
-    CREATE INDEX "item_user_pinned_recent_live_idx" ON "Item"
-      ("userId", "isPinned", "lastUsedAt" DESC NULLS LAST, "createdAt" DESC)
-      WHERE "deletedAt" IS NULL;
-    ```
-    EXPLAIN then shows `Limit → Index Scan` with **no Sort node**. It is also
-    narrower, and every read path filters `deletedAt IS NULL` so the partial
-    predicate costs no coverage.
-  - **Not applied.** Landing it in place means editing an already-applied migration,
-    which needs `prisma migrate reset` — Troy declined the reset at `review`, so the
-    original index ships as-is. It is still an improvement on nothing (the planner
-    uses it for the filter instead of a seq scan); it just doesn't remove the sort.
-  - Whoever picks this up: either reset the dev branch and edit
-    `20260806183738_item_list_sort_index` in place, or add a follow-up migration that
-    drops `Item_userId_deletedAt_isPinned_lastUsedAt_createdAt_idx` and creates the
-    partial one. The second is non-destructive but bakes a create-then-drop into
-    prod's history. `schema.prisma` carries a matching KNOWN LIMITATION comment.
-- **The same NullTest trap applies to the other three list indexes** from `init` —
-  they all lead `(userId, deletedAt, …)`. None of them can supply ordering either.
-  Worth a sweep whenever the above is picked up, rather than fixing one in isolation.
-- Quick win 2 changes `getCurrentUser` to select three extra columns for both
-  callers. That's deliberate — cheaper than a second round trip, and the `cache`
-  wrapper survives the swap to `auth()` when Auth.js lands.
-- Quick win 3 makes the app fail hard at import time on a fresh clone with no `.env`.
-  That is the intent, but it does mean the page's "unseeded database" empty state can
-  no longer be reached that way — the throw precedes the query.
-- No `shadcn add`, no `npm install`. Two migrations are expected; anything beyond
-  those two means something has been misread.
+<!-- Populated by /feature load -->
 
 ## Open Questions
 
-1. **Deploying to prod is not part of this round unless Troy says so.** Goals 7 and 8
-   make the migrations exist and apply them to the **dev** Neon branch. Prod has no
-   migrations applied at all, so `npm run db:deploy` against it would replay `init`
-   and both index migrations from empty, and prod has never been seeded either.
-   That is a production action with its own blast radius and needs an explicit go —
-   it is not being done silently as part of a cleanup round.
-2. **Commit type?** These are not `feat:`. Goals 1–4 read as `perf:` and `fix:`, 5–6
-   as `refactor:`, 7–8 as `perf:` and `fix:` with schema changes. One commit for the
-   lot, or split code from migrations?
-
-**Resolved at `start`:** the `AppSidebar` split is in (Troy said continue with the
-spec as written), and it is one branch — `feature/audit-fixes` — rather than two.
-
-**Resolved at `review`:** goal 7's index ships as originally built. The verified
-partial-index fix was declined because landing it needs a `migrate reset` on the dev
-branch; recorded above as a follow-up instead. Prisma's own CLI blocks an AI agent
-from running `migrate reset` without explicit user consent, which is what surfaced
-the decision.
+<!-- Populated by /feature load -->
 
 ## History
 
@@ -441,3 +291,99 @@ the decision.
   repo is a separate call, not something to fold into a `feat:` commit
 - Carried forward: the flat "Aug 3" item date from the unseeded `Item.createdAt`, and
   the prod Neon branch with no migrations applied and no seed
+
+### 2026-08-06 — Audit fixes (quick wins + index migrations)
+
+- Branch `feature/audit-fixes`, merged to `main` as `933af2a` (feature commit
+  `2e33b31`); branch deleted. Never pushed to origin, so nothing to clean up there
+- **The whole round came out of a subagent.** `.claude/agents/code-scanner.md` was
+  written and verified this session, then run: 0 critical, 0 high, 4 medium, 4 low
+  across 21 in-scope files. Its six `Quick wins` became the spec. Every `file:line`
+  it cited was re-checked against the tree before the spec was written — all eight
+  were exact, which is why the list was trusted enough to batch
+- Scope grew at `start`: Troy pulled the two `medium` index findings in, done as real
+  migrations, because dev and prod have to end up in sync and prod still has none
+- **Queries.** `rankTypesByCollection`'s `itemType.findMany()` had no `where` at all
+  and selected every row in `ItemType`; it now scopes to
+  `{ OR: [{ userId: null }, { userId }] }` like `getItemTypeCounts` already did.
+  `getCurrentUser` is wrapped in React `cache`, and `getCurrentUserId` derives from
+  it rather than issuing its own query — Prisma has no request-level dedupe, only
+  `fetch` gets that in Next 16. The sidebar's favorites query gained a `take`
+- **Measured rather than assumed:** instrumented the resolver and counted the dev
+  server log — **one** `User` query per dashboard request, repeatable, down from two.
+  The rendered HTML is identical either way, so nothing else would have caught it
+- **`src/lib/prisma.ts` now throws on a missing `DATABASE_URL`.** `PoolConfig`'s
+  `connectionString` is optional, so an unset variable typechecked and failed later
+  as an opaque driver error. Side effect worth knowing: a CI build without the
+  variable now fails at page-data collection instead of at runtime
+- **Two migrations, both hand-written** — Prisma expresses neither `NULLS LAST` nor a
+  partial index. `20260806183738_item_list_sort_index` and
+  `20260806183837_collection_name_unique_live`. The second drops
+  `@@unique([userId, name])` on `Collection` and replaces it with a partial unique
+  index `WHERE "deletedAt" IS NULL`, so deleting a collection and recreating it by
+  the same name no longer hits `P2002` against a row the user cannot see
+- Removing that `@@unique` was checked first, not assumed: `seedCollections` upserts
+  on `id`, and the `userId_name` compound key in the seed belongs to **Tag**
+- **The drift risk was resolved empirically.** A `--create-only` probe after both
+  migrations generated *"This is an empty migration"* — Prisma ignores partial
+  indexes in its diff, so neither `itemtype_system_slug_key` nor the two new ones are
+  at risk of being dropped, and it treats `DESC NULLS LAST` as matching its own
+  declaration. Probe deleted
+- **Gotcha for the next hand-edited migration:** running `migrate dev` after editing
+  a `--create-only` file generated a *duplicate* migration with a bare `DROP INDEX`,
+  which then failed against the shadow database (`P3006`/`42704`). The dev database
+  was never touched — the failure is shadow-only. Deleting the duplicate and re-running
+  applied cleanly
+- **Goal 7 shipped partial, and that is the one real miss.** Found at `review` by
+  asking whether the new index is *used*, not just whether it exists. `EXPLAIN` with
+  `enable_seqscan=off` shows the planner picking it for the filter but keeping a
+  **Sort node** on top — the exact cost the index was added to remove. Cause,
+  isolated by changing one predicate and nothing else: Postgres treats
+  `deletedAt IS NULL` as a **NullTest, not an equality**, and will not derive sort
+  order from key columns positioned after it. With `deletedAt = now()` the Sort
+  disappears; with `IS NULL` it stays
+- The fix was verified before being proposed — a partial index keyed
+  `(userId, isPinned, lastUsedAt DESC NULLS LAST, createdAt DESC)`
+  `WHERE deletedAt IS NULL`, created and dropped inside one transaction so the
+  database was left untouched. `EXPLAIN` then shows `Limit → Index Scan`, no Sort.
+  **Not applied:** landing it in place needs `prisma migrate reset`, which Troy
+  declined. The original index ships — still better than a seq scan for the filter,
+  just not the sort. `schema.prisma` carries a `KNOWN LIMITATION` comment
+- **Prisma's CLI blocks an AI agent from running `migrate reset` without explicit
+  user consent.** That guard is what surfaced the decision rather than letting a
+  destructive command through. `.env` and `.env.production` were confirmed to point
+  at different Neon endpoints before asking
+- **The same NullTest trap applies to the other three list indexes** from `init` —
+  all lead `(userId, deletedAt, …)`, so none can supply ordering either. Worth one
+  sweep rather than fixing them one at a time
+- `AppSidebar` went 302 → 68 lines: a data-fetching shell plus
+  `sidebar/TypesGroup.tsx`, `sidebar/CollectionsGroup.tsx`, `sidebar/SidebarUser.tsx`.
+  `main()` in `scripts/test-db.ts` became five functions
+- Beyond the spec, deliberately: two smoke-test checks proving the partial index
+  behaves — a duplicate *live* collection name is rejected, and the name becomes
+  reusable once the original is soft-deleted. A new constraint with nothing
+  exercising it seemed worse than the small scope creep
+- Verified: `db:status` in sync (4 migrations), `db:test` all pass, `lint`,
+  `tsc --noEmit`, `build` clean. Queried `pg_indexes` directly to confirm the
+  hand-edits survived into Postgres. Served HTML checked entry by entry — stats
+  18 / 5 / 6 / 3, Types 4 / 3 / 5 / 0 / 6 / 0 / 0 with PRO on Files and Images, the
+  same five collections with dots emerald / orange / emerald / violet / blue, Pinned
+  3 + Recent 10. Identical to the previous round
+- A dev server was already running on :3000 and Next refuses a second instance for
+  the same directory, so verification ran against it via HMR — and its log at
+  `.next/dev/logs/next-development.log` is what made the query count observable
+- **Not verified:** the favorites cap (3 favorites against a limit of 5) and the
+  nulls-last ordering (all 18 items have `lastUsedAt`) are unexercised by this seed.
+  No browser automation, so hover, responsive, and collapse-to-icon went unchecked —
+  same gap as every round since phase 2
+- Minor, flagged not fixed: `getSidebarCollections(userId, recentLimit, favoriteLimit)`
+  takes two adjacent unnamed numbers, both `5` today, so swapping them is type-safe
+  and currently invisible
+- `Collection` name uniqueness now lives **only in SQL** — the generated client no
+  longer exposes the `userId_name` compound key
+- Left untracked again, deliberately: `.claude/agents/code-scanner.md`. It predates
+  this feature and belongs to the same "does tooling config go in the repo" call as
+  the skills in `fe99ea5`, not folded into a `fix:` commit
+- Carried forward: goal 7's outstanding partial-index fix, the flat "Aug 3" item date
+  from the unseeded `Item.createdAt`, and the prod Neon branch with no migrations
+  applied and no seed
