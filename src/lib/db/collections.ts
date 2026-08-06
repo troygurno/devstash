@@ -123,13 +123,19 @@ export async function getRecentCollections(
 export async function getSidebarCollections(
   userId: string,
   recentLimit: number,
+  favoriteLimit: number,
 ): Promise<SidebarCollections> {
   const [favorites, recent] = await Promise.all([
     prisma.collection.findMany({
       // Alphabetical: a pinned-by-hand list shouldn't reorder itself whenever an
       // item is added, the way the Recent list below is meant to.
+      //
+      // Capped like Recent — the sidebar renders every row it gets back, and an
+      // uncapped list also widens the id set fed to the grouped count below.
+      // "View all collections" is the overflow.
       where: { userId, deletedAt: null, isFavorite: true },
       orderBy: { name: "asc" },
+      take: favoriteLimit,
       select: COLLECTION_ACCENT_SELECT,
     }),
     prisma.collection.findMany({
@@ -203,7 +209,11 @@ async function rankTypesByCollection(
         AND i."deletedAt" IS NULL
       GROUP BY ic."collectionId", i."itemTypeId"
     `,
+    // System types plus this user's own, matching getItemTypeCounts. Without the
+    // scope this selects every row in ItemType — invisible while custom types are
+    // unbuilt, an unbounded scan once they land and the table grows per user.
     prisma.itemType.findMany({
+      where: { OR: [{ userId: null }, { userId }] },
       select: { id: true, name: true, slug: true, icon: true, sortOrder: true },
     }),
   ]);

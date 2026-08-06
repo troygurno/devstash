@@ -132,15 +132,17 @@ function printDemoData(
   }
 }
 
-async function main() {
-  if (!process.env.DATABASE_URL) {
-    throw new Error("DATABASE_URL is not set — check .env against .env.example");
-  }
+/** The columns the later sections need off a system type. */
+type SystemType = { id: string; name: string; slug: string };
 
+async function checkConnection() {
   console.log("\nConnection");
   const [{ now }] = await prisma.$queryRaw<[{ now: Date }]>`SELECT now() as now`;
   check("reached the database", Boolean(now), now?.toISOString());
+}
 
+/** Returns the system types — both later sections need them. */
+async function checkSeedData() {
   console.log("\nSeed data");
   const systemTypes = await prisma.itemType.findMany({
     where: { isSystem: true },
@@ -162,6 +164,10 @@ async function main() {
     systemTypes.map((t) => t.slug).join(","),
   );
 
+  return systemTypes;
+}
+
+async function checkDemoWorkingSet(systemTypes: SystemType[]) {
   console.log("\nDemo working set");
   const demo = await loadDemoUser();
 
@@ -245,7 +251,9 @@ async function main() {
         EXPECTED_ITEMS - 2,
     );
   }
+}
 
+async function checkConstraints() {
   console.log("\nConstraints");
   // @@unique([userId, slug]) can't catch this — Postgres treats NULL as distinct,
   // so the partial unique index from the second migration has to.
@@ -266,7 +274,14 @@ async function main() {
     duplicateRejected = true;
   }
   check("duplicate system slug rejected", duplicateRejected);
+}
 
+/**
+ * Creates a throwaway user, exercises the write path against it, then deletes it
+ * and asserts the cascades fired. The cascade checks stay in here because they
+ * assert on the user this function created.
+ */
+async function checkCrudRoundTrip(systemTypes: SystemType[]) {
   console.log("\nCRUD round-trip");
   await removeTestUser();
 
@@ -313,6 +328,32 @@ async function main() {
   });
   check("soft-deleted item excluded from live query", live.length === 0);
 
+  // collection_user_name_live_key is partial (WHERE deletedAt IS NULL), so a name
+  // is unique among live rows only. Prisma can't express that, so nothing but this
+  // check covers it.
+  let duplicateNameRejected = false;
+  try {
+    await prisma.collection.create({
+      data: { name: "Smoke Collection", userId: user.id },
+    });
+  } catch {
+    duplicateNameRejected = true;
+  }
+  check("duplicate live collection name rejected", duplicateNameRejected);
+
+  await prisma.collection.update({
+    where: { id: collection.id },
+    data: { deletedAt: new Date() },
+  });
+  const reused = await prisma.collection.create({
+    data: { name: "Smoke Collection", userId: user.id },
+  });
+  check(
+    "name reusable once the original is soft-deleted",
+    Boolean(reused.id),
+    "partial index ignores deleted rows",
+  );
+
   console.log("\nCascades");
   await removeTestUser();
   const orphanedItems = await prisma.item.count({ where: { userId: user.id } });
@@ -332,6 +373,18 @@ async function main() {
     survivingTypes === EXPECTED_SYSTEM_TYPES,
     `found ${survivingTypes}`,
   );
+}
+
+async function main() {
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL is not set — check .env against .env.example");
+  }
+
+  await checkConnection();
+  const systemTypes = await checkSeedData();
+  await checkDemoWorkingSet(systemTypes);
+  await checkConstraints();
+  await checkCrudRoundTrip(systemTypes);
 }
 
 main()

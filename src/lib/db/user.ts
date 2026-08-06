@@ -6,6 +6,8 @@
  * user" goes through here, so swapping in `auth()` later is a change to one
  * function rather than a sweep across every query.
  */
+import { cache } from "react";
+
 import { prisma } from "@/lib/prisma";
 
 /** The demo account seeded by prisma/seed.ts. */
@@ -20,24 +22,29 @@ export interface CurrentUser {
   image: string | null;
 }
 
-/** Null on an unseeded database — callers render their empty state. */
-export async function getCurrentUserId(): Promise<string | null> {
-  const user = await prisma.user.findUnique({
-    where: { email: DEMO_USER_EMAIL },
-    select: { id: true },
-  });
-
-  return user?.id ?? null;
-}
-
 /**
- * The same account with the columns needed to display it. Separate from
- * `getCurrentUserId` so a page that only scopes a query doesn't pull four
- * columns it never reads.
+ * Null on an unseeded database — callers render their empty state.
+ *
+ * Wrapped in React's `cache` so the layout and the page share one query per
+ * request. Prisma has no request-level deduplication of its own — in Next 16 only
+ * `fetch` gets that — and both `AppSidebar` (from the layout) and the dashboard
+ * page ask for the current user on every render. The four display columns cost
+ * far less than the second round trip they replace, so there is one resolver
+ * rather than a narrow and a wide one.
+ *
+ * The wrapper survives the swap to `auth()`: the caching stays useful, only the
+ * lookup underneath changes.
  */
-export async function getCurrentUser(): Promise<CurrentUser | null> {
+export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   return prisma.user.findUnique({
     where: { email: DEMO_USER_EMAIL },
     select: { id: true, name: true, email: true, image: true },
   });
+});
+
+/** The current user's id alone. Shares `getCurrentUser`'s cached result. */
+export async function getCurrentUserId(): Promise<string | null> {
+  const user = await getCurrentUser();
+
+  return user?.id ?? null;
 }
