@@ -81,6 +81,14 @@ const ITEM_TYPE_DOT_CLASSES: Record<string, string> = {
 };
 
 /**
+ * The Pro-gated system types, per `context/project-overview.md` §4. This lives
+ * here rather than on the model because `ItemType` has no `isPro` column — a
+ * type's tier is presentation until the Phase 4 gates in `limits.ts` land, and
+ * those will enforce server-side regardless of what the sidebar renders.
+ */
+const PRO_ITEM_TYPE_SLUGS = new Set(["files", "images"]);
+
+/**
  * Type slug → plural label. `ItemType.name` is singular ("Snippet") because it
  * names one item; a nav entry standing for a whole category reads as "Snippets".
  */
@@ -120,4 +128,9 @@ export function getItemTypeDotClass(slug: string): string {
 /** Falls back to the stored name, which is what a custom type will have. */
 export function getItemTypePluralLabel(slug: string, name: string): string {
   return ITEM_TYPE_PLURAL_LABELS[slug] ?? name;
+}
+
+/** Display only — the real gate is server-side, per `project-overview.md` §10. */
+export function isProItemType(slug: string): boolean {
+  return PRO_ITEM_TYPE_SLUGS.has(slug);
 }
