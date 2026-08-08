@@ -1,6 +1,8 @@
 import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
 
+import { SIGN_IN_PATH } from "@/lib/auth-routes";
+
 import authConfig from "./auth.config";
 
 /**
@@ -21,17 +23,20 @@ const { auth } = NextAuth(authConfig);
 export const proxy = auth((req) => {
   if (req.auth) return;
 
-  // NextAuth's built-in sign-in page — no custom `pages.signIn` this phase.
-  const signInUrl = new URL("/api/auth/signin", req.nextUrl.origin);
+  // The custom page. `SIGN_IN_PATH` is also `pages.signIn` in the shared config,
+  // so this redirect and Auth.js's own agree by construction rather than by
+  // two string literals happening to match.
+  const signInUrl = new URL(SIGN_IN_PATH, req.nextUrl.origin);
   signInUrl.searchParams.set("callbackUrl", req.nextUrl.href);
 
   return NextResponse.redirect(signInUrl);
 });
 
 /**
- * Only the dashboard. `/api/auth/*` is deliberately outside the matcher — guarding
- * the sign-in route with the thing that redirects to it is an infinite loop.
- * `:path*` matches zero segments too, so bare `/dashboard` is covered.
+ * Only the dashboard. `/sign-in`, `/register`, and `/api/auth/*` are deliberately
+ * outside the matcher — guarding the sign-in route with the thing that redirects to
+ * it is an infinite loop. `:path*` matches zero segments too, so bare `/dashboard`
+ * is covered.
  */
 export const config = {
   matcher: ["/dashboard/:path*"],
