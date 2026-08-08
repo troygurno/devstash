@@ -387,3 +387,94 @@ Not Started
 - Carried forward: goal 7's outstanding partial-index fix, the flat "Aug 3" item date
   from the unseeded `Item.createdAt`, and the prod Neon branch with no migrations
   applied and no seed
+
+### 2026-08-08 — Auth phase 1 (NextAuth v5 + GitHub OAuth)
+
+- Branch `feature/auth-phase-1`, merged to `main` as `c42f518` (feature commit
+  `771c85c`); branch deleted. All 8 goals met
+- **The first round verified end to end against a real external service.** Playwright
+  MCP arrived this session, and the dev-server log carries the whole chain:
+  `POST /api/auth/signin/github 302` → `GET /api/auth/callback/github?code=… 302` →
+  `GET /dashboard 200` with `proxy.ts: 30ms`. Every previous round since phase 2 closed
+  with "no browser automation this session"
+- Installed `next-auth@5.0.0-beta.32` and `@auth/prisma-adapter@2.11.3`. The `@beta`
+  tag is load-bearing — `@latest` still resolves to v4
+- **The spec's rationale for the split config is obsolete in Next 16, and the split
+  was kept anyway.** Auth.js documents `auth.config.ts` without the adapter as an
+  *edge-runtime* workaround; Next 16's upgrade guide states the edge runtime is **not
+  supported** in `proxy` and the runtime is `nodejs` and not configurable. So the split
+  buys bundle size, not compatibility. It starts earning its keep again in phase 2,
+  when bcrypt would otherwise land in a request filter. Recorded in the file's comment
+  so the next reader doesn't inherit the stale reason
+- **The JWT type augmentation has to target `@auth/core/jwt`, not `next-auth/jwt`.**
+  The latter is a bare `export * from "@auth/core/jwt"`, so `JWT` is not declared in
+  it — `declare module "next-auth/jwt"` silently defines a *second*, unrelated
+  interface. `token.id` stayed `unknown`, which narrows to `{}` inside a truthiness
+  check, and `tsc` failed with `Type '{}' is not assignable to type 'string'`. That
+  error message names neither the cause nor the file
+- No migration, as predicted at `load`: `Account`, `Session`, and `VerificationToken`
+  have been in `schema.prisma` since `init`, and `User` already had `passwordHash`,
+  `emailVerified`, and `image`. **First feature since the database landed to add zero
+  migrations**
+- **The database confirmed the JWT strategy rather than the config asserting it.**
+  After sign-in: 2 users, 1 `Account` (`provider: github`, `type: oauth`, scope
+  `read:user,user:email`, access token stored), and **0 `Session` rows**. A database
+  strategy would have written one. The GitHub user has a cuid id, an image, and
+  `passwordHash` null — OAuth-only, exactly what the schema comment anticipated
+- `AUTH_SECRET` was empty in `.env` and generated with `crypto.randomBytes(32)`,
+  patching that one line in place rather than rewriting a file holding live
+  credentials. `AUTH_GITHUB_ID` / `_SECRET` were already populated — the OAuth app
+  predates this round
+- **Two defects found at `review` and fixed before the commit:**
+  1. The `session` callback assigned `session.user.id` only under `if (token.id)`,
+     but `Session["user"]["id"]` is typed **non-optional** — any path with the claim
+     missing would hand callers `undefined` under a `string` type. Now falls back to
+     `token.sub`, NextAuth's own copy of the user id on a JWT session, which makes the
+     pair genuinely exhaustive instead of merely likely. Phases 2 and 3 both build
+     directly on `session.user.id`
+  2. `.playwright-mcp/` was untracked and would have gone into the commit — snapshots,
+     console logs, and screenshots from the session's browser runs. Added to
+     `.gitignore`
+- **A stale dev server cost real time and is worth recognising next round.** The one on
+  :3000 had been up since Aug 6, two days before `next-auth` was installed, and its
+  module graph was stale: `/api/auth/signin` returned **500** behind a
+  *"Jest worker encountered 2 child process exceptions"* error that names nothing real.
+  A restart fixed it outright. Previous rounds relied on HMR picking changes up, which
+  works for edits and **not** for a new dependency
+- Related, same cause: `npx tsc --noEmit` failed three times in
+  `.next/dev/types/validator.ts` with `TS1434` on a line reading
+  `s AppPageConfig<"/dashboard">> = Specific` — a **torn write** by the running dev
+  server, not a code error. `rm -rf .next/dev/types` and one request regenerated it
+- `.env.example` gained the three `AUTH_*` keys, the callback URL, and the secret
+  generation command. Beyond the spec's five files, but it is the repo's only
+  onboarding doc for environment variables
+- Both open questions from `load` were answered by Troy at `start`, both to the
+  recommended default: **`getCurrentUserId()` keeps resolving `demo@devstash.io`**, and
+  **`/` stays the scaffold placeholder**. So signing in with GitHub is currently
+  invisible — the dashboard still renders the demo user's 18 items, and the GitHub user
+  owns 0. Phase 3's sidebar work is where that closes
+- **Two environment gaps flagged, not fixed** — neither blocks a dev-only phase, both
+  block a deploy: `.env.production` has `AUTH_SECRET=` **empty** (Auth.js throws
+  `MissingSecret` at runtime), and its `AUTH_GITHUB_ID` / `_SECRET` appear to be the
+  same dev OAuth app, whose callback is `localhost:3000`. A leftover
+  `BETTER_AUTH_SECRET` sits in both env files from an earlier experiment
+- **Known trap in `proxy.ts`:** it builds its own Auth.js instance from the
+  adapter-free config, which carries **no `jwt`/`session` callbacks**. `req.auth` is
+  correct for the truthiness check it does today, but `req.auth.user.id` would be
+  `undefined` there. Commented in the file
+- Verified: `lint`, `tsc --noEmit`, and `build` clean before and after the review
+  fixes. The build registers `ƒ Proxy (Middleware)` and `ƒ /api/auth/[...nextauth]`.
+  Unauthenticated `/dashboard` returns **307** to
+  `/api/auth/signin?callbackUrl=…%2Fdashboard`; the default sign-in page renders the
+  GitHub button; the handoff carries `redirect_uri=…/api/auth/callback/github`, PKCE
+  `code_challenge_method=S256`, and scope `read:user user:email`
+- **Not verified by me:** the GitHub login form itself — that needs Troy's credentials,
+  so Troy completed the sign-in and the result was confirmed from the database and the
+  server log rather than watched. Sign-*out*, session expiry, and a second sign-in
+  linking to the existing `Account` row are all unexercised
+- Left untracked again, deliberately, for the third round running: `.claude/` and
+  `.mcp.json`. `CLAUDE.md` also has uncommitted changes that **predate this feature**
+  (Troy's Neon MCP branch-safety rules) — not folded into a `feat:` commit
+- Carried forward: goal 7's outstanding partial-index fix from the audit round, the
+  flat "Aug 3" item date from the unseeded `Item.createdAt`, and the prod Neon branch
+  with no migrations applied and no seed
