@@ -478,3 +478,112 @@ Not Started
 - Carried forward: goal 7's outstanding partial-index fix from the audit round, the
   flat "Aug 3" item date from the unseeded `Item.createdAt`, and the prod Neon branch
   with no migrations applied and no seed
+
+### 2026-08-08 — Auth phase 2 (Credentials: email/password + registration)
+
+- Branch `feature/auth-phase-2`, merged to `main` as `6a67bc0` (feature commit
+  `9a82f3b`); branch deleted. All 7 goals met
+- **The spec's central instruction cannot work, and fails silently.** It says: put
+  `authorize: () => null` in `auth.config.ts`, then *override* it in `auth.ts`. The
+  literal implementation — `{ ...provider, authorize }` — typechecks, builds, and is
+  **discarded at request time**. `Credentials(config)` returns
+  `{ …defaults, authorize: () => null, options: config }`, stashing the caller's
+  object under `options`; Auth.js then resolves providers with
+  `merge(defaults, userOptions, …)` in `@auth/core/lib/utils/providers.js`, so
+  `options.authorize` — the placeholder — is applied *over* anything set at the top
+  level. The only symptom is `error=CredentialsSignin` on a password you know is
+  correct. The fix is to **build a new provider**, not patch the returned one;
+  `CREDENTIAL_FIELDS` is exported from `auth.config.ts` so both instances describe the
+  same form. Found by testing sign-in, not by reading — nothing static catches it
+- **bcrypt silently truncates at 72 bytes.** Verified against bcryptjs 3.0.3:
+  `compare("a"×72 + "XXXX", hashOf("a"×72 + "DIFFERENT_TAIL"))` returns **true**.
+  Uncapped, a long password from a manager is quietly reduced to its first 72 bytes
+  and anything sharing that prefix authenticates. `registerSchema` rejects past the
+  limit rather than truncating, measured in **bytes not characters** — 25 emoji is 25
+  characters and 100 bytes, so a `.max()` on length would not have caught it
+- Installed **`zod` 4.4.3**, the first validation library in the repo, answering
+  `coding-standards.md`'s standing "validate all inputs with Zod" against a file that
+  did not exist. Zod 4 specifics: `z.email()` is top-level (not `z.string().email()`),
+  and `z.flattenError(err).fieldErrors` is the standalone replacement for the
+  deprecated `.flatten()`. `src/lib/validations/auth.ts` is the new home, beside
+  `src/lib/db/` — the second subdirectory under `lib/`
+- **Zero migrations, as predicted at `load`** — `User.passwordHash` has been in the
+  schema since `init`. Second feature running to add none, and `db:status` stayed at 4
+- `credentialsSchema` deliberately does **not** apply the registration password policy.
+  An account created before a policy change must still authenticate; enforcing
+  `min(8)` at sign-in would lock a user out of their own row. Only non-empty is
+  required — bcrypt decides the rest
+- **Three decisions taken at `start`, all to the recommended default:** install Zod;
+  reject registration against an email that already has a GitHub account (409, rather
+  than attaching a password to an account the requester does not own — that is an
+  account-takeover path, not a convenience); and an 8-character minimum with no
+  complexity rules
+- The register route is a **route handler, not a Server Action**, returning real
+  201/400/409 statuses — one of the reasons `coding-standards.md` names for choosing a
+  route at all. `isUniqueConstraintError` duck-types `P2002` rather than importing the
+  `Prisma` namespace, the same call `src/lib/db/items.ts` made about `Prisma.ItemSelect`.
+  The `findUnique` check is not atomic, so the `@unique` on `email` is the real
+  guarantee and the catch handles the race
+- **The bundle split was measured, not asserted.** Phase 1 claimed the adapter-free
+  config buys bundle size and nothing had ever checked. Built
+  `.next/server/middleware.js` is **221 bytes** with **zero** references to `bcryptjs`,
+  `@prisma/client`, `@prisma/adapter-neon`, `@neondatabase`, or `zod` — in the bundle
+  or in its `.nft.json` trace. The split does exactly what it was kept for
+- **`session.user.id` verified for a credentials user, which nothing had exercised.**
+  The dashboard reads `getCurrentUserId()` (still `demo@devstash.io`), so landing on
+  `/dashboard` proves nothing about the session. Fetched `/api/auth/session` directly:
+  the id matches the registered row exactly and no `passwordHash` or `$2b$` string
+  appears anywhere in the payload. Phase 3 builds straight onto this
+- Timing equalization: `authorize` compares against a fixed dummy hash when no account
+  matches. Measured — wrong password **956ms**, OAuth-only account **946ms**, unknown
+  email **898ms**, indistinguishable; a malformed request short-circuits at the schema
+  (**28ms**), which reveals nothing about which accounts exist. Beyond the spec, and
+  flagged as such at `review`; **Troy chose to keep it**
+- **The database confirmed the strategy again.** After a credentials sign-in: `Session`
+  rows **0** and `Account` rows still **1** (the GitHub one). Auth.js writes neither for
+  Credentials, which is exactly why the register route has to create the `User` itself
+- Verified: `lint`, `tsc --noEmit`, `build`, and `db:test` (all checks) clean. Register
+  returns **201** with no `passwordHash` in the response; **409** on a duplicate email
+  and on the GitHub account's email; **400** with field-keyed errors on mismatch, short
+  password, bad email, blank name, and malformed JSON. The **seeded demo user signs in**
+  with `12345678` — validating against a 12-round hash this feature never produced,
+  which is a stronger check than round-tripping its own output. Uppercase email
+  normalizes. GitHub's handoff is unchanged from phase 1: same scope, `redirect_uri`,
+  and PKCE `S256`, with `/api/auth/providers` listing `github, credentials`
+- **`/api/auth/register` resolves ahead of the `[...nextauth]` catch-all** beside it —
+  Next matches static segments before dynamic ones. First time the app depends on that;
+  confirmed in the served response rather than reasoned about
+- **Git Bash `curl` mangles multibyte request bodies and nearly produced a false bug
+  report.** Emoji passwords returned **201** through curl where they should have been
+  rejected, and the stored hash matched none of the candidate strings I could
+  reconstruct. The byte cap is correct — proven against the schema directly and via
+  `node` `fetch` over real HTTP (**400**). Use `fetch` from a script, not curl, for any
+  payload that is not plain ASCII
+- The dev server on :3000 picked up both a **new dependency and new route files**
+  without a restart this round, unlike phase 1. The stale-server failure mode is real
+  but not guaranteed
+- **Two gaps flagged at `review`, neither fixed, neither blocking:**
+  1. `/api/auth/register` has **no rate limit**. It is unauthenticated, creates rows,
+     and burns ~250ms of CPU per call on bcrypt — a cheap account-spam and
+     CPU-exhaustion vector. Belongs with `project-overview.md` §12 Q7
+  2. **Email case normalization is one-sided.** This route and `authorize` lowercase;
+     the GitHub adapter writes whatever GitHub returns, and `User.email` is unique
+     *case-sensitively* in Postgres. So `Troy@Example.com` (OAuth) and
+     `troy@example.com` (registered) can coexist as two rows for one person. Latent
+     until today, because there was only one way to create a user. A real fix is
+     adapter-level normalization or a `citext` migration
+- Six throwaway accounts were created against the Neon `development` branch while
+  testing and **all deleted** with Troy's approval; the branch is back to the demo user
+  and the GitHub user. A JWT session outlives the row it names — deleting a user does
+  not invalidate their session, which will matter in phase 3 once `getCurrentUserId()`
+  reads `session.user.id` instead of resolving the demo account
+- **`proxy.ts` now builds an instance whose Credentials provider is the inert
+  `() => null`.** Harmless — it only reads the session cookie — but it sits beside the
+  existing comment about `req.auth.user.id` being `undefined` there
+- Left untracked again, deliberately, for the fourth round running: `.claude/` and
+  `.mcp.json`. `CLAUDE.md`'s uncommitted Neon MCP branch-safety rules still **predate
+  this feature** and were not folded into a `feat:` commit. `auth-phase-3-spec.md` stays
+  untracked for its own round — every prior feature commit carried only its own spec
+- Carried forward: goal 7's outstanding partial-index fix from the audit round, the
+  flat "Aug 3" item date from the unseeded `Item.createdAt`, `.env.production`'s empty
+  `AUTH_SECRET`, and the prod Neon branch with no migrations applied and no seed
