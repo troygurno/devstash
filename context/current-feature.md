@@ -587,3 +587,126 @@ Not Started
 - Carried forward: goal 7's outstanding partial-index fix from the audit round, the
   flat "Aug 3" item date from the unseeded `Item.createdAt`, `.env.production`'s empty
   `AUTH_SECRET`, and the prod Neon branch with no migrations applied and no seed
+
+### 2026-08-08 — Auth phase 3 (custom sign-in, register, account menu)
+
+- Branch `feature/auth-phase-3`, merged to `main` as `0053420` (feature commit
+  `4d2435d`); branch deleted. All 8 goals met
+- **The app finally renders whoever is signed in.** `getCurrentUser()` resolves
+  `session.user.id` instead of the hardcoded `demo@devstash.io` it has carried since
+  the collections round. Proven by signing in as two different accounts and getting
+  two different dashboards: 18 / 5 / 6 / 3 for the demo user, all zeros and every
+  empty state for a freshly registered one. Those empty states had been "code-read
+  only" in four consecutive rounds — exercising them needed a user with no data, which
+  is exactly what this feature created
+- It reads the **row**, not the token's `name`/`email`/`image` claims. A profile edit
+  then shows up on the next request rather than at the next sign-in, and a session
+  naming a deleted row resolves to null instead of a ghost
+- **Two bugs, both found by testing rather than reading, which is now the pattern for
+  three phases running:**
+  1. **The account row would not open its menu.** `SidebarMenuButton` returns a
+     `<Tooltip>` wrapper instead of the button whenever `tooltip` is set, so
+     `DropdownMenuTrigger asChild` handed its click handler and ref to a context
+     provider that renders no DOM. It typechecked, built, and rendered; the only
+     symptom was a button with no `aria-haspopup`. Dropping the `tooltip` prop fixed
+     it. Nothing is lost — the menu's own label repeats the name and email, so a
+     collapsed sidebar still identifies the account. **The same shape as phase 2's
+     provider bug: a correct-looking composition silently discarded at runtime**
+  2. **A session naming a deleted user trapped the account with no way out.** Hit
+     live, on a stale cookie left by phase 2's deleted throwaway accounts:
+     `getCurrentUser()` returned null, so the sidebar footer never rendered — and the
+     footer is where sign-out lives. Empty dashboard, no escape. The dashboard layout
+     now redirects on a null user. **The naive version of that fix is an infinite
+     loop** — `/dashboard` rejects the session, `/sign-in` sees `auth()` truthy and
+     bounces it back — so both auth pages gate on the resolved user instead. A stale
+     cookie lands on the form, which is the one thing that can replace it
+- Beyond the spec, deliberately, and the only scope creep: that layout redirect. Goal
+  1 is what *created* the trap, so shipping it without the guard would have shipped a
+  state users cannot leave
+- **`SidebarUser` stayed a server component** — Troy's call, rejecting a first pass
+  that marked the whole file `'use client'`. The shadcn dropdown primitives are
+  already client modules, so a server component can render them and their children
+  cross the boundary as props. Only `SignOutMenuItem` needs a handler, so only that is
+  29 lines of client code. The two forms are genuinely interactive and are the app's
+  first real client-side data flow
+- `SIGN_IN_PATH` is one constant shared by `pages.signIn` and `proxy.ts`, so the
+  redirect targets cannot drift into two string literals that merely happen to match.
+  `pages.error` points at the same page, so a failed GitHub handoff lands on the form
+  rather than Auth.js's default error page
+- **`toInternalPath` exists because the credentials form navigates itself.**
+  `redirect: false` is what lets a rejection render in place with the typed email
+  intact, but it also means Auth.js's own same-origin check never runs on
+  `callbackUrl`. Unit-tested across 10 inputs: `//evil.example/pwned` gives
+  `/dashboard`, `https://evil.example/pwned` gives `/pwned` on localhost, garbage
+  gives `/dashboard`
+- Both forms validate against the **existing** Zod schemas rather than restating the
+  rules in JSX, so the 8-character minimum, the 72-byte bcrypt cap, and the
+  passwords-match refinement stay stated once. Confirmed the client pass
+  short-circuits: an invalid submit makes **zero** network requests
+- `credentialsSchema` gained friendly messages but **no rules** — Zod 4's default
+  `min(1)` text reads "Too small: expected string to have >=1 characters". Its
+  deliberate lack of a password policy is untouched; applying registration rules at
+  sign-in would lock out accounts created under an older policy
+- `lucide-react` v1 **dropped its brand icons**, so `Github` no longer exists and the
+  mark is an inline SVG. Checked rather than assumed, after `Loader2` / `LoaderCircle`
+  raised the question
+- **Two defects found at `review` and fixed before the merge:**
+  1. `role="alert"` on the success notice — assertive, so it would talk over whatever
+     the screen reader was already announcing about the just-loaded page. The role now
+     follows the variant: `alert` for errors, `status` for the success notice
+  2. The GitHub button disabled the whole form and never re-enabled. The happy path
+     navigates away and the promise never settles, but on rejection the form sat
+     permanently disabled with nothing said and no retry. Now caught, with
+     `OAuthSignin` and `OAuthCallback` added to the error map
+- **Zero migrations** — third feature running, and `db:status` stayed at 4. This phase
+  touched no schema at all
+- The proxy bundle was re-measured after `auth.config.ts` gained an import: still
+  **221 bytes**, still zero references to bcrypt, Prisma, Neon, or Zod.
+  `auth-routes.ts` is dependency-free precisely so that stays true
+- Verified in the browser: custom `/sign-in` renders; a wrong password shows one
+  generic inline message with the email preserved and no `?error=` bounce; the demo
+  account signs in; the dropdown opens **upward** with its width matching the trigger
+  exactly (so `--radix-dropdown-menu-trigger-width` resolved); Profile is a real
+  `<a href="/settings">`; sign-out clears the session (`/api/auth/session` returns
+  `null`, cookies gone, `/dashboard` redirects); registration redirects to
+  `/sign-in?registered=1`; an uppercase email normalizes on both register and sign-in;
+  initials render `PT` from "Phase Three Tester". `lint`, `tsc --noEmit`, `build`, and
+  `db:test` all clean
+- GitHub's handoff is unchanged from phases 1 and 2 — PKCE `S256`,
+  `redirect_uri=…/api/auth/callback/github`, scope `read:user user:email`
+- **Not verified by me:** completing the GitHub login, which needs Troy's credentials —
+  and therefore the avatar's **image** path. Only the initials fallback was exercised
+  on screen, though the GitHub user's row does carry an `image`
+- **The stale dev server bit again, exactly as phase 1 warned.** The one on :3000
+  predated this round's new routes and served a chunk compiled mid-edit, throwing
+  `ReferenceError: auth is not defined` from a file whose source was clean, alongside
+  the same meaningless "Jest worker encountered 2 child process exceptions". A restart
+  fixed both. Phase 2 got away without one; that was luck, not a rule
+- **A long detour was spent on dead clicks that turned out not to be the app.** Raw
+  `page.mouse` and then `locator.click()` stopped delivering events entirely — a
+  control on the always-working sidebar toggle produced zero `pointerdown` events too,
+  which is what proved it environmental. Restarting the browser fixed it.
+  `devIndicators: false` also appeared in `next.config.ts` mid-session (not mine, kept
+  at Troy's request), and the Next dev indicator sits exactly where the account row is,
+  so it is an equally good explanation. **Which one it was is unresolved.** The
+  `tooltip` / `asChild` bug is independent of both and was confirmed by the attribute
+- Lesson worth keeping: when a click does nothing, check whether *any* event reaches
+  the document before touching the component. `elementFromPoint` said the trigger was
+  on top, which ruled out the overlay theory too early
+- One throwaway account was created and **deleted with Troy's approval**. A
+  `John Doe / john@gmail.com` row predates this session's testing and was left alone
+- **Flagged, not fixed:** the Profile link points at `/settings`, which **does not
+  exist yet** and 404s — same as the sidebar's existing `/items/*` and `/collections/*`
+  links. `project-overview.md` §7 still says `/login` where the app now serves
+  `/sign-in`, the second piece of §7 drift after the PRO badge round's diamond marker.
+  Phase 2's two gaps are untouched and now more exposed by a public sign-up page:
+  `/api/auth/register` still has **no rate limit**, and email case normalization is
+  still one-sided. `AppSidebar`'s `user ? … : null` fallbacks are now unreachable
+  behind the layout redirect, left as defence in depth
+- Left untracked again, deliberately, for the fifth round running and explicitly at
+  Troy's request this time: `.claude/`, `.mcp.json`, and `CLAUDE.md`'s Neon MCP
+  branch-safety rules. `next.config.ts`'s `devIndicators: false` **was** included, also
+  at Troy's request, despite not originating from this feature
+- Carried forward: goal 7's outstanding partial-index fix from the audit round, the
+  flat "Aug 3" item date from the unseeded `Item.createdAt`, `.env.production`'s empty
+  `AUTH_SECRET`, and the prod Neon branch with no migrations applied and no seed
