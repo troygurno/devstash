@@ -62,6 +62,6 @@ export type RegisterInput = z.infer<typeof registerSchema>;
  * Only non-empty is required; bcrypt decides the rest.
  */
 export const credentialsSchema = z.object({
-  email: z.email().toLowerCase(),
-  password: z.string().min(1),
+  email: z.email("Enter a valid email address").toLowerCase(),
+  password: z.string().min(1, "Enter your password"),
 });

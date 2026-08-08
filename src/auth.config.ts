@@ -1,14 +1,18 @@
 import Credentials from "next-auth/providers/credentials";
 import GitHub from "next-auth/providers/github";
 
+import { SIGN_IN_PATH } from "@/lib/auth-routes";
+
 import type { NextAuthConfig } from "next-auth";
 import type { CredentialInput } from "next-auth/providers";
 
 /**
- * The email and password fields the built-in `/api/auth/signin` page renders.
+ * The email and password fields the Credentials provider accepts.
  *
- * Exported because `auth.ts` rebuilds the Credentials provider to attach the real
- * `authorize`, and both instances have to describe the same form.
+ * Nothing renders them now that `pages.signIn` points at a custom page —
+ * `src/components/auth/SignInForm.tsx` owns the markup. They stay because the
+ * provider still declares its input shape, and because `auth.ts` rebuilds the
+ * provider to attach the real `authorize`; both instances have to agree.
  */
 export const CREDENTIAL_FIELDS = {
   email: { label: "Email", type: "email" },
@@ -26,6 +30,19 @@ export const CREDENTIAL_FIELDS = {
  * `AUTH_<PROVIDER>_ID` convention means the provider needs no arguments.
  */
 export const authConfig = {
+  /**
+   * Send every Auth.js redirect to the custom page instead of the built-in one at
+   * `/api/auth/signin`. This lives in the shared config rather than in `auth.ts`
+   * so `proxy.ts` — which builds its own instance from this object — agrees about
+   * where an unauthenticated request goes.
+   *
+   * It also sets where provider errors land: a failed GitHub handoff arrives at
+   * `/sign-in?error=…` rather than at Auth.js's own error page.
+   */
+  pages: {
+    signIn: SIGN_IN_PATH,
+    error: SIGN_IN_PATH,
+  },
   providers: [
     GitHub,
     Credentials({

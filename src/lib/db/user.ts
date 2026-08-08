@@ -1,17 +1,15 @@
 /**
  * Current-user resolution.
  *
- * Auth.js isn't wired up yet, so there is no session to read and no way to know
- * who is looking at the page. Every server component that needs "the current
- * user" goes through here, so swapping in `auth()` later is a change to one
- * function rather than a sweep across every query.
+ * Every server component that needs "the current user" goes through here. Until
+ * auth phase 3 this resolved the seeded demo account by email; it now reads the
+ * signed-in user from the Auth.js session, which is the swap that one function
+ * existed to absorb.
  */
 import { cache } from "react";
 
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-
-/** The demo account seeded by prisma/seed.ts. */
-const DEMO_USER_EMAIL = "demo@devstash.io";
 
 /** What the sidebar footer needs to render an account row. */
 export interface CurrentUser {
@@ -23,21 +21,28 @@ export interface CurrentUser {
 }
 
 /**
- * Null on an unseeded database — callers render their empty state.
+ * Null when nobody is signed in, and null when the session names a row that no
+ * longer exists — callers render their empty state for both.
  *
- * Wrapped in React's `cache` so the layout and the page share one query per
+ * That second case is real rather than defensive. Sessions are JWTs, so they
+ * outlive the row they name: deleting a user does not invalidate their cookie, and
+ * the id inside it keeps resolving until the token expires. Reading the row rather
+ * than trusting the token's own `name`/`email`/`image` claims also means a profile
+ * edit shows up on the next request instead of at the next sign-in.
+ *
+ * Wrapped in React's `cache` so the layout and the page share one lookup per
  * request. Prisma has no request-level deduplication of its own — in Next 16 only
  * `fetch` gets that — and both `AppSidebar` (from the layout) and the dashboard
- * page ask for the current user on every render. The four display columns cost
- * far less than the second round trip they replace, so there is one resolver
- * rather than a narrow and a wide one.
- *
- * The wrapper survives the swap to `auth()`: the caching stays useful, only the
- * lookup underneath changes.
+ * page ask for the current user on every render.
  */
 export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
+  const session = await auth();
+  const userId = session?.user?.id;
+
+  if (!userId) return null;
+
   return prisma.user.findUnique({
-    where: { email: DEMO_USER_EMAIL },
+    where: { id: userId },
     select: { id: true, name: true, email: true, image: true },
   });
 });

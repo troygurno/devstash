@@ -23,10 +23,11 @@ const FAVORITE_COLLECTION_COUNT = 5;
 const NO_COLLECTIONS: SidebarCollections = { favorites: [], recent: [] };
 
 /**
- * Reads from Postgres via the demo account — there's no session yet, so an
- * unseeded database renders the groups empty rather than failing. Every href is
- * correct per the route table in context/project-overview.md, but /items and
- * /collections don't exist yet.
+ * Reads from Postgres for whoever is signed in. `getCurrentUser` resolves the
+ * session, so a request that somehow reaches here without one renders the groups
+ * empty rather than failing — as does a signed-in user with nothing stashed yet.
+ * Every href is correct per the route table in context/project-overview.md, but
+ * /items and /collections don't exist yet.
  *
  * This is the data-fetching shell only; the three sections are pure
  * presentational server components under sidebar/.
